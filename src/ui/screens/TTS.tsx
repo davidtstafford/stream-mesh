@@ -40,6 +40,8 @@ const TTS: React.FC = () => {
   const [configLoaded, setConfigLoaded] = useState(false);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [pollyConfig, setPollyConfig] = useState<PollyConfig | null>(null);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -74,6 +76,17 @@ const TTS: React.FC = () => {
       }
     };
     fetchVoices();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Load TTS settings on mount
+  useEffect(() => {
+    let isMounted = true;
+    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean }) => {
+      if (!isMounted) return;
+      setTtsEnabled(!!settings.enabled);
+      setTtsSettingsLoaded(true);
+    });
     return () => { isMounted = false; };
   }, []);
 
@@ -138,6 +151,13 @@ const TTS: React.FC = () => {
     setSelectedVoice(e.target.value);
   };
 
+  // Handler for toggling TTS enabled
+  const handleToggleTts = async () => {
+    const newEnabled = !ttsEnabled;
+    setTtsEnabled(newEnabled);
+    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: newEnabled });
+  };
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
       <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>TTS Settings</h2>
@@ -145,8 +165,12 @@ const TTS: React.FC = () => {
         Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
       </div>
       <div style={{ marginBottom: 16 }}>
-        <label><input type="checkbox" /> Enable TTS</label>
-        <span style={{ marginLeft: 12, color: '#2ecc40' }}>TTS is OFF</span>
+        <label>
+          <input type="checkbox" checked={ttsEnabled} onChange={handleToggleTts} disabled={!ttsSettingsLoaded} /> Enable TTS
+        </label>
+        <span style={{ marginLeft: 12, color: ttsEnabled ? '#2ecc40' : '#ff4d4f' }}>
+          TTS is {ttsEnabled ? 'ON' : 'OFF'}
+        </span>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label><input type="checkbox" /> Read name before message</label>

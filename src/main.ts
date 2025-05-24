@@ -13,6 +13,7 @@ import { ttsQueue } from './backend/services/ttsQueue';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
+const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 
 function saveTwitchAuth(auth: { username: string, accessToken: string }) {
   fs.writeFileSync(authFilePath, JSON.stringify(auth, null, 2), 'utf-8');
@@ -27,6 +28,26 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
   } catch {
     return null;
   }
+}
+
+// TTS global settings (for extensibility)
+interface TTSSettings {
+  enabled: boolean;
+  // Future: per-user overrides, blocklist, message prefix, etc.
+}
+
+function loadTTSSettings(): TTSSettings {
+  try {
+    const data = fs.readFileSync(ttsSettingsFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    // Default: TTS off
+    return { enabled: false };
+  }
+}
+
+function saveTTSSettings(settings: TTSSettings) {
+  fs.writeFileSync(ttsSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -183,6 +204,15 @@ app.whenReady().then(async () => {
     return getPollyConfig();
   });
 
+  // TTS settings IPC handlers
+  ipcMain.handle('tts:getSettings', async () => {
+    return loadTTSSettings();
+  });
+  ipcMain.handle('tts:setSettings', async (_event, settings: TTSSettings) => {
+    saveTTSSettings(settings);
+    return true;
+  });
+
   ipcMain.handle('polly:speak', async (_event, { text, voiceId, engine }) => {
     return synthesizeSpeech(text, voiceId, engine);
   });
@@ -213,12 +243,15 @@ app.whenReady().then(async () => {
 
   // Listen to chatBus and enqueue chat messages for TTS
   chatBus.onChatMessage((event) => {
-    // Only enqueue if TTS is enabled (add logic if needed)
-    ttsQueue.enqueue({
-      text: event.message,
-      user: event.user,
-      // Optionally: voiceId/engine from config
-    });
+    // Only enqueue if TTS is enabled
+    const ttsSettings = loadTTSSettings();
+    if (ttsSettings.enabled) {
+      ttsQueue.enqueue({
+        text: event.message,
+        user: event.user,
+        // Optionally: voiceId/engine from config or per-user in future
+      });
+    }
     // Send live chat message to renderer for real-time update
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
