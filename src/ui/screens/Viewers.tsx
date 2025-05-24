@@ -76,6 +76,16 @@ const Viewers: React.FC = () => {
     // Optionally, refresh viewers/settings if needed
   };
 
+  // Delete a viewer and their settings
+  const handleDelete = async (viewerId: string) => {
+    if (!ipcRenderer) return;
+    if (!window.confirm('Are you sure you want to delete this viewer and all their settings?')) return;
+    setLoading(true);
+    await ipcRenderer.invoke('deleteViewer', viewerId);
+    setViewers(viewers.filter(v => v.id !== viewerId));
+    setLoading(false);
+  };
+
   const filteredViewers = viewers.filter(v =>
     v.name?.toLowerCase().includes(search.toLowerCase()) ||
     v.id?.toLowerCase().includes(search.toLowerCase()) ||
@@ -93,21 +103,6 @@ const Viewers: React.FC = () => {
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff' }}
         />
-        <button
-          style={{ padding: '8px 18px', borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}
-          onClick={async () => {
-            console.log('[Viewers Debug] ipcRenderer:', ipcRenderer); // Debug log
-            if (!ipcRenderer) {
-              alert('ipcRenderer is not available!');
-              return;
-            }
-            const data = await ipcRenderer.invoke('fetchViewers');
-            console.log('[Viewers Debug] Manual fetchViewers result:', data);
-            alert('Check the console for the viewers debug output.');
-          }}
-        >
-          Debug: Print Viewers
-        </button>
       </div>
       <table style={{ width: '100%', background: '#23272b', borderRadius: 8, borderCollapse: 'collapse' }}>
         <thead style={{ background: '#181c20' }}>
@@ -131,10 +126,17 @@ const Viewers: React.FC = () => {
                 <td style={{ padding: 8 }}>{viewer.lastActive}</td>
                 <td style={{ padding: 8 }}>
                   <button
-                    style={{ padding: '4px 12px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none', cursor: 'pointer' }}
+                    style={{ padding: '4px 12px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none', cursor: 'pointer', marginRight: 8 }}
                     onClick={() => openEditModal(viewer)}
                   >
                     Edit Settings
+                  </button>
+                  <button
+                    style={{ padding: '4px 12px', borderRadius: 4, background: '#c0392b', color: '#fff', border: 'none', cursor: 'pointer' }}
+                    onClick={() => handleDelete(viewer.id)}
+                    disabled={loading}
+                  >
+                    Delete
                   </button>
                 </td>
               </tr>

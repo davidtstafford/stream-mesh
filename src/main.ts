@@ -329,6 +329,25 @@ app.whenReady().then(async () => {
     ));
   });
 
+  ipcMain.handle('deleteViewer', async (_event, viewerId) => {
+    return new Promise((resolve, reject) => {
+      // Delete from settings (KVP table) first, then viewers
+      const db = require('./backend/core/database');
+      fetchSettings((err, rows) => {
+        if (err) return reject(err.message);
+        // Delete all settings for this viewer
+        db.db.run('DELETE FROM settings WHERE viewer_id = ?', [viewerId], (err2: Error | null) => {
+          if (err2) return reject(err2.message);
+          // Delete the viewer itself
+          db.db.run('DELETE FROM viewers WHERE id = ?', [viewerId], (err3: Error | null) => {
+            if (err3) return reject(err3.message);
+            resolve(true);
+          });
+        });
+      });
+    });
+  });
+
   // Listen to chatBus and enqueue chat messages for TTS
   chatBus.onChatMessage((event) => {
     // --- Upsert viewer on every chat message ---
