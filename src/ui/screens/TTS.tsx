@@ -43,6 +43,7 @@ const TTS: React.FC = () => {
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
   const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
+  const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -83,10 +84,11 @@ const TTS: React.FC = () => {
   // Load TTS settings on mount
   useEffect(() => {
     let isMounted = true;
-    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean }) => {
+    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean, includePlatformWithName: boolean }) => {
       if (!isMounted) return;
       setTtsEnabled(!!settings.enabled);
       setReadNameBeforeMessage(!!settings.readNameBeforeMessage);
+      setIncludePlatformWithName(!!settings.includePlatformWithName);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -157,14 +159,36 @@ const TTS: React.FC = () => {
   const handleToggleTts = async () => {
     const newEnabled = !ttsEnabled;
     setTtsEnabled(newEnabled);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: newEnabled, readNameBeforeMessage });
+    await window.electron.ipcRenderer.invoke('tts:setSettings', {
+      enabled: newEnabled,
+      readNameBeforeMessage,
+      includePlatformWithName
+    });
   };
 
   // Handler for toggling readNameBeforeMessage
   const handleToggleReadName = async () => {
     const newValue = !readNameBeforeMessage;
     setReadNameBeforeMessage(newValue);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: ttsEnabled, readNameBeforeMessage: newValue });
+    // If disabling, also disable includePlatformWithName
+    const newIncludePlatform = newValue ? includePlatformWithName : false;
+    setIncludePlatformWithName(newIncludePlatform);
+    await window.electron.ipcRenderer.invoke('tts:setSettings', {
+      enabled: ttsEnabled,
+      readNameBeforeMessage: newValue,
+      includePlatformWithName: newIncludePlatform
+    });
+  };
+
+  // Handler for toggling includePlatformWithName
+  const handleToggleIncludePlatform = async () => {
+    const newValue = !includePlatformWithName;
+    setIncludePlatformWithName(newValue);
+    await window.electron.ipcRenderer.invoke('tts:setSettings', {
+      enabled: ttsEnabled,
+      readNameBeforeMessage,
+      includePlatformWithName: newValue
+    });
   };
 
   return (
@@ -190,6 +214,19 @@ const TTS: React.FC = () => {
             ? 'TTS will say "Alice says ..." or "Alice asks ..." before the message.'
             : 'TTS will only read the message.'}
         </div>
+        {readNameBeforeMessage && (
+          <div style={{ marginTop: 8, marginLeft: 24 }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={includePlatformWithName}
+                onChange={handleToggleIncludePlatform}
+                disabled={!ttsSettingsLoaded || !readNameBeforeMessage}
+              />{' '}
+              Include platform with name (e.g. "Alice from Twitch says ...")
+            </label>
+          </div>
+        )}
       </div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>

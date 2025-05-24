@@ -34,6 +34,7 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
 interface TTSSettings {
   enabled: boolean;
   readNameBeforeMessage: boolean;
+  includePlatformWithName: boolean;
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -45,10 +46,11 @@ function loadTTSSettings(): TTSSettings {
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : false,
       readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
+      includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
     };
   } catch {
-    // Default: TTS off, no name prefix
-    return { enabled: false, readNameBeforeMessage: false };
+    // Default: TTS off, no name prefix, no platform
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false };
   }
 }
 
@@ -254,10 +256,14 @@ app.whenReady().then(async () => {
     if (ttsSettings.enabled) {
       let ttsText = event.message;
       if (ttsSettings.readNameBeforeMessage && event.user) {
+        let namePart = event.user;
+        if (ttsSettings.includePlatformWithName && event.platform) {
+          namePart = `${event.user} from ${event.platform}`;
+        }
         if (ttsText.trim().endsWith('?')) {
-          ttsText = `${event.user} asks ${ttsText}`;
+          ttsText = `${namePart} asks ${ttsText}`;
         } else {
-          ttsText = `${event.user} says ${ttsText}`;
+          ttsText = `${namePart} says ${ttsText}`;
         }
       }
       ttsQueue.enqueue({
