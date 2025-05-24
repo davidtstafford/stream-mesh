@@ -80,16 +80,12 @@ const TTS: React.FC = () => {
   // Set selectedVoice and selectedEngine only after both config and voices are loaded
   useEffect(() => {
     if (!configLoaded || !voicesLoaded) return;
-    // Only set on first load
     setSelectedVoice(prev => {
-      // If already set and valid, keep it
       if (prev && voices.some(v => v.Name === prev)) return prev;
-      // If config.voiceId is valid, use it
       if (pollyConfig && pollyConfig.voiceId && voices.some(v => v.Name === pollyConfig.voiceId)) {
         setSelectedEngine(engineMap[pollyConfig.voiceId][0]);
         return pollyConfig.voiceId;
       }
-      // Otherwise, use the first available
       if (voices.length > 0) {
         setSelectedEngine(engineMap[voices[0].Name][0]);
         return voices[0].Name;
@@ -136,13 +132,10 @@ const TTS: React.FC = () => {
     setPollyConfig(newConfig);
     setSaving(false);
     setStatus('Saved!');
-    console.log('[TTS.tsx] Saved config:', newConfig);
   };
 
   const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedVoice(e.target.value);
-    // selectedEngine will be set by useEffect
-    console.log('[TTS.tsx] User changed voice to:', e.target.value);
   };
 
   return (

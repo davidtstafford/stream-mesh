@@ -175,13 +175,11 @@ app.whenReady().then(async () => {
 
   // Polly IPC handlers
   ipcMain.handle('polly:configure', async (_event, config) => {
-    console.log('[main] polly:configure called', config);
     configurePolly(config);
     return true;
   });
 
   ipcMain.handle('polly:getConfig', async () => {
-    console.log('[main] polly:getConfig called');
     return getPollyConfig();
   });
 

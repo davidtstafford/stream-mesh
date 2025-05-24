@@ -18,7 +18,6 @@ let pollyConfig: PollyConfig | null = null;
 const configFilePath = path.join(app.getPath('userData'), 'ttsConfig.json');
 
 export function configurePolly(config: PollyConfig) {
-  console.log('[awsPolly] configurePolly called with config:', config);
   pollyConfig = config;
   polly = new AWS.Polly({
     accessKeyId: config.accessKeyId,
@@ -28,14 +27,12 @@ export function configurePolly(config: PollyConfig) {
   // Persist config to disk, including voiceId and engine
   try {
     fs.writeFileSync(configFilePath, JSON.stringify(config, null, 2), 'utf-8');
-    console.log('[awsPolly] Config saved to', configFilePath);
   } catch (err) {
-    console.error('[Polly] Error saving config:', err);
+    // Optionally, handle error silently or log minimal error
   }
 }
 
 export function getPollyConfig(): PollyConfig | null {
-  // Always reload from disk to ensure latest config is used
   try {
     const data = fs.readFileSync(configFilePath, 'utf-8');
     const config = JSON.parse(data);
@@ -45,10 +42,8 @@ export function getPollyConfig(): PollyConfig | null {
       secretAccessKey: config.secretAccessKey,
       region: config.region,
     });
-    console.log('[awsPolly] getPollyConfig: loaded from disk', config);
     return pollyConfig;
   } catch (err) {
-    console.log('[awsPolly] getPollyConfig: failed to load config from disk', err);
     return null;
   }
 }
@@ -63,7 +58,6 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
     Engine: engine as any || 'standard',
     SampleRate: '16000', // 16kHz mono
   };
-  console.log('[awsPolly] synthesizeSpeech params:', params);
   const result = await polly.synthesizeSpeech(params).promise();
   if (!result.AudioStream) throw new Error('No audio stream returned');
   // Convert PCM to WAV header
@@ -71,7 +65,6 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
   const filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.wav`);
   const wavBuffer = pcmToWav(result.AudioStream as Buffer, 16000, 1);
   fs.writeFileSync(filePath, wavBuffer);
-  console.log('[awsPolly] synthesizeSpeech: wrote file', filePath);
   return filePath;
 }
 
