@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import pollyVoiceEngines from '../assets/pollyVoiceEngines.json';
 
+// PollyConfig type (copy from backend)
+interface PollyConfig {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  voiceId?: string;
+  engine?: string;
+}
+
 // Extend the voice type to include SupportedEngines
 interface PollyVoice {
   Id: string;
@@ -28,42 +37,66 @@ const TTS: React.FC = () => {
   const [voices, setVoices] = useState<PollyVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
   const [selectedEngine, setSelectedEngine] = useState('');
-
-  // Fetch available voices from Polly after config is saved
-  useEffect(() => {
-    const fetchVoices = async () => {
-      try {
-        const result = await window.electron.ipcRenderer.invoke('polly:listVoices');
-        // Ensure voices have SupportedEngines (backend should provide this)
-        setVoices(result.voices || []);
-        if (result.voices && result.voices.length > 0) {
-          setSelectedVoice(result.voices[0].Id);
-          setSelectedEngine(result.voices[0].SupportedEngines[0]);
-        }
-      } catch (err) {
-        setStatus('Could not fetch Polly voices');
-      }
-    };
-    fetchVoices();
-  }, []);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
+  const [pollyConfig, setPollyConfig] = useState<PollyConfig | null>(null);
 
   // Load saved AWS config on mount
   useEffect(() => {
-    const fetchConfig = async () => {
+    let isMounted = true;
+    setConfigLoaded(false);
+    window.electron.ipcRenderer.invoke('polly:getConfig').then((config: PollyConfig) => {
+      if (!isMounted) return;
+      setPollyConfig(config);
+      setConfigLoaded(true);
+      if (config) {
+        setAccessKeyId(config.accessKeyId || '');
+        setSecretAccessKey(config.secretAccessKey || '');
+        setRegion(config.region || '');
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  // Fetch available voices from Polly after config is saved
+  useEffect(() => {
+    let isMounted = true;
+    setVoicesLoaded(false);
+    const fetchVoices = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('polly:getConfig');
-        if (config) {
-          setAccessKeyId(config.accessKeyId || '');
-          setSecretAccessKey(config.secretAccessKey || '');
-          setRegion(config.region || '');
-          setSelectedVoice(config.voiceId || '');
-        }
+        const result = await window.electron.ipcRenderer.invoke('polly:listVoices');
+        if (!isMounted) return;
+        setVoices(result.voices || []);
+        setVoicesLoaded(true);
       } catch (err) {
-        // Ignore if config not found
+        setStatus('Could not fetch Polly voices');
+        setVoicesLoaded(true);
       }
     };
-    fetchConfig();
+    fetchVoices();
+    return () => { isMounted = false; };
   }, []);
+
+  // Set selectedVoice and selectedEngine only after both config and voices are loaded
+  useEffect(() => {
+    if (!configLoaded || !voicesLoaded) return;
+    // Only set on first load
+    setSelectedVoice(prev => {
+      // If already set and valid, keep it
+      if (prev && voices.some(v => v.Name === prev)) return prev;
+      // If config.voiceId is valid, use it
+      if (pollyConfig && pollyConfig.voiceId && voices.some(v => v.Name === pollyConfig.voiceId)) {
+        setSelectedEngine(engineMap[pollyConfig.voiceId][0]);
+        return pollyConfig.voiceId;
+      }
+      // Otherwise, use the first available
+      if (voices.length > 0) {
+        setSelectedEngine(engineMap[voices[0].Name][0]);
+        return voices[0].Name;
+      }
+      return '';
+    });
+  }, [configLoaded, voicesLoaded, voices, pollyConfig]);
 
   // Save config on change
   useEffect(() => {
@@ -89,21 +122,27 @@ const TTS: React.FC = () => {
   }, [selectedVoice]);
 
   const handleSave = async () => {
+    if (!pollyConfig) return;
     setSaving(true);
-    setStatus(null);
-    try {
-      await window.electron.ipcRenderer.invoke('polly:configure', {
-        accessKeyId,
-        secretAccessKey,
-        region,
-        voiceId: selectedVoice,
-        engine: selectedEngine,
-      });
-      setStatus('Saved!');
-    } catch (err) {
-      setStatus('Failed to save Polly config');
-    }
+    const newConfig = {
+      ...pollyConfig,
+      accessKeyId,
+      secretAccessKey,
+      region,
+      voiceId: selectedVoice,
+      engine: selectedEngine,
+    };
+    await window.electron.ipcRenderer.invoke('polly:configure', newConfig);
+    setPollyConfig(newConfig);
     setSaving(false);
+    setStatus('Saved!');
+    console.log('[TTS.tsx] Saved config:', newConfig);
+  };
+
+  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedVoice(e.target.value);
+    // selectedEngine will be set by useEffect
+    console.log('[TTS.tsx] User changed voice to:', e.target.value);
   };
 
   return (
@@ -124,7 +163,7 @@ const TTS: React.FC = () => {
         <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>
         <select
           value={selectedVoice}
-          onChange={e => setSelectedVoice(e.target.value)}
+          onChange={handleVoiceChange}
           style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333' }}
         >
           {filteredVoices.length === 0 ? (
@@ -178,6 +217,22 @@ const TTS: React.FC = () => {
         {status && <div style={{ color: status === 'Saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{status}</div>}
       </div>
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
+      <div style={{ marginTop: 24 }}>
+        <button
+          style={{ background: '#ff4d4f', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
+          onClick={async () => {
+            setStatus(null);
+            try {
+              await window.electron.ipcRenderer.invoke('tts:clearQueue');
+              setStatus('TTS backlog cleared!');
+            } catch (err) {
+              setStatus('Failed to clear TTS backlog');
+            }
+          }}
+        >
+          Clear TTS Backlog
+        </button>
+      </div>
     </div>
   );
 };

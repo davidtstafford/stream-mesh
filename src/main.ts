@@ -9,6 +9,7 @@ import { chatBus } from './backend/services/chatBus';
 import { registerChatBusDbListener } from './backend/core/database';
 import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
+import { ttsQueue } from './backend/services/ttsQueue';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -174,11 +175,13 @@ app.whenReady().then(async () => {
 
   // Polly IPC handlers
   ipcMain.handle('polly:configure', async (_event, config) => {
+    console.log('[main] polly:configure called', config);
     configurePolly(config);
     return true;
   });
 
   ipcMain.handle('polly:getConfig', async () => {
+    console.log('[main] polly:getConfig called');
     return getPollyConfig();
   });
 
@@ -199,6 +202,30 @@ app.whenReady().then(async () => {
     const data = fs.readFileSync(filePath);
     const base64 = data.toString('base64');
     return `data:audio/mp3;base64,${base64}`;
+  });
+
+  // TTS queue IPC handlers
+  ipcMain.handle('tts:clearQueue', async () => {
+    ttsQueue.clearQueue();
+    return true;
+  });
+  ipcMain.handle('tts:queueStatus', async () => {
+    return { length: ttsQueue.getQueueLength() };
+  });
+
+  // Listen to chatBus and enqueue chat messages for TTS
+  chatBus.onChatMessage((event) => {
+    // Only enqueue if TTS is enabled (add logic if needed)
+    ttsQueue.enqueue({
+      text: event.message,
+      user: event.user,
+      // Optionally: voiceId/engine from config
+    });
+    // Send live chat message to renderer for real-time update
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      win.webContents.send('chat:live', event);
+    }
   });
 
   // Only create the window after all handlers are registered
