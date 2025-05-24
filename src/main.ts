@@ -2,7 +2,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById } from './backend/core/database';
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
 import { chatBus } from './backend/services/chatBus';
@@ -94,7 +94,24 @@ function createWindow() {
   }
 }
 
+function cleanUpTempTTSFiles() {
+  const userDataDir = app.getPath('userData');
+  const files = fs.readdirSync(userDataDir);
+  for (const file of files) {
+    // Only delete files that match the temp TTS pattern
+    if (/^streammesh_tts_\d+\.wav$/.test(file)) {
+      try {
+        fs.unlinkSync(path.join(userDataDir, file));
+        console.log('[cleanup] Deleted temp TTS file:', file);
+      } catch (err) {
+        console.warn('[cleanup] Failed to delete temp TTS file:', file, err);
+      }
+    }
+  }
+}
+
 app.whenReady().then(async () => {
+  cleanUpTempTTSFiles();
   initDatabase();
   registerChatBusDbListener();
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
@@ -266,6 +283,51 @@ app.whenReady().then(async () => {
     }
   });
 
+  // IPC handlers for viewers moderation system
+  ipcMain.handle('fetchViewers', async () => {
+    return new Promise((resolve, reject) => {
+      fetchViewers((err, rows) => {
+        if (err) reject(err.message);
+        else resolve((rows || []).map(row => ({
+          id: row.id,
+          name: row.platform_key, // Use platform_key as display name
+          platform: row.platform,
+          lastActive: row.last_active_time,
+        })));
+      });
+    });
+  });
+
+  ipcMain.handle('fetchSettings', async () => {
+    return new Promise((resolve, reject) => {
+      fetchSettings((err, rows) => {
+        if (err) reject(err.message);
+        else resolve(rows);
+      });
+    });
+  });
+
+  ipcMain.handle('fetchViewerSettings', async (_event, viewerId) => {
+    return new Promise((resolve, reject) => {
+      fetchViewerSettings(viewerId, (err, rows) => {
+        if (err) reject(err.message);
+        else resolve(rows);
+      });
+    });
+  });
+
+  ipcMain.handle('updateViewerSettings', async (_event, viewerId, settings) => {
+    // settings: { [setting_id]: value }
+    return Promise.all(Object.entries(settings).map(([setting_id, value]) =>
+      new Promise((resolve, reject) => {
+        upsertViewerSetting({ viewer_id: viewerId, setting_id, value: value as string | null }, err => {
+          if (err) reject(err.message);
+          else resolve(true);
+        });
+      })
+    ));
+  });
+
   // Listen to chatBus and enqueue chat messages for TTS
   chatBus.onChatMessage((event) => {
     // Only enqueue if TTS is enabled
@@ -312,6 +374,10 @@ app.on('window-all-closed', () => {
   // Prevent immediate quit for debugging
   console.log('window-all-closed event');
   // Do not quit immediately
+});
+
+app.on('before-quit', () => {
+  cleanUpTempTTSFiles();
 });
 
 app.on('activate', () => {
