@@ -1,0 +1,120 @@
+:root {
+  --background-dark: #181c20;
+  --background-light: #f5f6fa;
+  --text-dark: #fff;
+  --text-light: #181c20;
+}
+
+body[data-theme='dark'], [data-theme='dark'] {
+  background: var(--background-dark) !important;
+  color: var(--text-dark) !important;
+}
+body[data-theme='light'], [data-theme='light'] {
+  background: var(--background-light) !important;
+  color: var(--text-light) !important;
+}
+
+[data-theme='dark'] {
+  --background: #181c20;
+  --surface: #23272b;
+  --text-color: #fff;
+}
+[data-theme='light'] {
+  --background: #f5f6fa;
+  --surface: #fff;
+  --text-color: #181c20;
+}
+
+body, #root, .app-root {
+  background: var(--background) !important;
+  color: var(--text-color) !important;
+  transition: background 0.2s, color 0.2s;
+}
+
+nav, main, table, input, select, textarea, button, div, section {
+  background: inherit;
+  color: inherit;
+}
+
+input, select, textarea, button {
+  border-color: #333;
+}
+
+nav {
+  background: var(--surface) !important;
+  color: var(--text-color) !important;
+  border-right: 1px solid #ddd !important;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.03);
+}
+
+nav div, nav span, nav label {
+  color: var(--text-color) !important;
+}
+
+nav {
+  transition: background 0.2s, color 0.2s;
+}
+
+main {
+  background: var(--background) !important;
+}
+
+button {
+  background: var(--button-bg, #3a3f4b);
+  color: var(--button-text, #fff);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  transition: background 0.2s, color 0.2s;
+}
+
+[data-theme='light'] button {
+  --button-bg: #e0e0e0;
+  --button-text: #181c20;
+}
+
+[data-theme='dark'] button {
+  --button-bg: #3a3f4b;
+  --button-text: #fff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:active, button:focus {
+  outline: 2px solid #0078d4;
+  outline-offset: 2px;
+}
+
+[data-theme='light'] nav {
+  background: #fff !important;
+  color: #181c20 !important;
+  border-right: 1px solid #bbb !important;
+}
+[data-theme='light'] nav div, [data-theme='light'] nav span, [data-theme='light'] nav label {
+  color: #181c20 !important;
+}
+[data-theme='light'] .active-nav {
+  background: #e0e0e0 !important;
+  color: #181c20 !important;
+}
+[data-theme='light'] nav div[style*='background: #222'] {
+  background: #f9f9f9 !important;
+  color: #181c20 !important;
+  font-weight: bold;
+  border-top: 1px solid #e0e0e0 !important;
+}
+[data-theme='light'] nav div[style*='background: rgb(34, 34, 34)'] {
+  background: #f9f9f9 !important;
+  color: #181c20 !important;
+  font-weight: bold;
+  border-top: 1px solid #e0e0e0 !important;
+}
+[data-theme='dark'] nav div[style*='background: #222'] {
+  background: #222 !important;
+  color: #fff !important;
+  font-weight: bold;
+  border-top: 1px solid #333 !important;
+}

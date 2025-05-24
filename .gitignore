@@ -1,0 +1,60 @@
+# Node
+node_modules/
+
+# Build output
+dist/
+build/
+*.log
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+.history/
+
+# Environment
+.env
+.env.*
+
+# Electron
+*.asar
+
+# Misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Compiled source
+*.out.js
+*.out.js.map
+
+# SQLite database
+*.sqlite
+
+# Local auth/cache
+*.json
+!package.json
+!tsconfig.json
+
+# Ignore installer output
+*.exe
+*.msi
+
+# Ignore test coverage
+coverage/
+
+# Ignore user data
+*.local
+*.cache
+
+# Ignore Mac system files
+Icon?
+
+# Ignore Windows system files
+Desktop.ini
+
+# Ignore Copilot custom instructions
+.github/copilot-instructions.md

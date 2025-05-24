@@ -1,0 +1,43 @@
+{
+  "name": "streammesh",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "concurrently \"npm:serve\" \"npm:electron\"",
+    "serve": "webpack serve --config webpack.config.js --mode development",
+    "electron": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
+    "build": "webpack --config webpack.config.js --mode production && npm run build-main",
+    "build-main": "tsc --project tsconfig.json --outDir dist --noEmit false"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/webpack-env": "^1.18.8",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "css-loader": "^7.1.2",
+    "electron": "^36.3.1",
+    "html-webpack-plugin": "^5.6.3",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "wait-on": "^8.0.3",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.1"
+  },
+  "dependencies": {
+    "@types/react": "^19.1.5",
+    "@types/react-dom": "^19.1.5",
+    "aws-sdk": "^2.1692.0",
+    "electron-is-dev": "^3.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "sqlite3": "^5.1.7",
+    "tmi.js": "^1.8.5"
+  }
+}
