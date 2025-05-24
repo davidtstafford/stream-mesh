@@ -2,7 +2,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting } from './backend/core/database';
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
 import { chatBus } from './backend/services/chatBus';
@@ -10,6 +10,7 @@ import { registerChatBusDbListener } from './backend/core/database';
 import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
+import crypto from 'crypto';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -290,8 +291,8 @@ app.whenReady().then(async () => {
         if (err) reject(err.message);
         else resolve((rows || []).map(row => ({
           id: row.id,
-          name: row.platform_key, // Use platform_key as display name
-          platform: row.platform,
+          name: row.name, // Use name as display name
+          platform: row.platform, // Return the real platform value
           lastActive: row.last_active_time,
         })));
       });
@@ -330,6 +331,20 @@ app.whenReady().then(async () => {
 
   // Listen to chatBus and enqueue chat messages for TTS
   chatBus.onChatMessage((event) => {
+    // --- Upsert viewer on every chat message ---
+    // Generate a unique viewer id as a hash of platform and user id
+    const platformUserId = event.tags?.['user-id'] || event.user;
+    const platform = event.platform;
+    // Use a 12-character truncated SHA-256 hash for viewer ID (safe, compact, and unique for this use case)
+    const viewerKey = crypto.createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
+    upsertViewer({
+      id: viewerKey,
+      name: event.user,
+      platform: event.platform,
+      platform_key: platformUserId,
+      last_active_time: event.time,
+    });
+
     // Only enqueue if TTS is enabled
     const ttsSettings = loadTTSSettings();
     if (ttsSettings.enabled) {

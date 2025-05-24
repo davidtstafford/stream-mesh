@@ -14,3 +14,10 @@ contextBridge.exposeInMainWorld('electron', {
     removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
   }
 });
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  ipcRenderer: {
+    invoke: (...args: Parameters<typeof ipcRenderer.invoke>) => ipcRenderer.invoke(...args),
+    // You can add more methods if needed
+  }
+});

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: null };
+// Use the preload-exposed ipcRenderer for secure IPC
+const ipcRenderer = window.electronAPI?.ipcRenderer;
 
 interface Viewer {
   id: string;
@@ -34,9 +35,21 @@ const Viewers: React.FC = () => {
 
   // Fetch viewers and settings on mount
   useEffect(() => {
+    console.log('[Viewers Debug] ipcRenderer:', ipcRenderer); // Debug log
     if (!ipcRenderer) return;
-    ipcRenderer.invoke('fetchViewers').then((data: Viewer[]) => setViewers(data));
-    ipcRenderer.invoke('fetchSettings').then((data: Setting[]) => setSettings(data));
+    const fetchViewersAndSettings = () => {
+      ipcRenderer.invoke('fetchViewers').then((data: any[]) => {
+        console.log('[Viewers Debug] fetchViewers result:', data); // Debug log
+        setViewers(data.map(v => ({
+          id: v.id,
+          name: v.name, // This is platform_key in the DB, but mapped as name in the backend
+          platform: v.platform,
+          lastActive: v.lastActive,
+        })));
+      });
+      ipcRenderer.invoke('fetchSettings').then((data: Setting[]) => setSettings(data));
+    };
+    fetchViewersAndSettings();
   }, []);
 
   // When opening modal, fetch viewer's settings
@@ -80,6 +93,21 @@ const Viewers: React.FC = () => {
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff' }}
         />
+        <button
+          style={{ padding: '8px 18px', borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}
+          onClick={async () => {
+            console.log('[Viewers Debug] ipcRenderer:', ipcRenderer); // Debug log
+            if (!ipcRenderer) {
+              alert('ipcRenderer is not available!');
+              return;
+            }
+            const data = await ipcRenderer.invoke('fetchViewers');
+            console.log('[Viewers Debug] Manual fetchViewers result:', data);
+            alert('Check the console for the viewers debug output.');
+          }}
+        >
+          Debug: Print Viewers
+        </button>
       </div>
       <table style={{ width: '100%', background: '#23272b', borderRadius: 8, borderCollapse: 'collapse' }}>
         <thead style={{ background: '#181c20' }}>

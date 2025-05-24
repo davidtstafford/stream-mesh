@@ -29,6 +29,8 @@ export function initDatabase() {
   db.run(`CREATE TABLE IF NOT EXISTS viewers (
     id TEXT PRIMARY KEY, -- Hash of platform user id and platform name
     name TEXT NOT NULL,  -- Display name of the viewer
+    platform TEXT NOT NULL, -- Platform name (e.g., 'twitch')
+    platform_key TEXT,   -- Platform-specific user id or key
     last_active_time DATETIME NOT NULL -- Last time the viewer was active
   )`);
 
@@ -71,19 +73,19 @@ export function deleteChatMessageById(id: number, cb: (err: Error | null) => voi
 }
 
 // Upsert a viewer (insert if new, update last_active_time if exists)
-export function upsertViewer({ id, platform, platform_key, last_active_time }: { id: string, platform: string, platform_key: string, last_active_time: string }, cb?: (err: Error | null) => void) {
+export function upsertViewer({ id, name, platform, platform_key, last_active_time }: { id: string, name: string, platform: string, platform_key: string, last_active_time: string }, cb?: (err: Error | null) => void) {
   db.run(
-    `INSERT INTO viewers (id, platform, platform_key, last_active_time)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO viewers (id, name, platform, platform_key, last_active_time)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET last_active_time=excluded.last_active_time` ,
-    [id, platform, platform_key, last_active_time],
+    [id, name, platform, platform_key, last_active_time],
     cb || (() => {})
   );
 }
 
 // Fetch all viewers (for UI table)
 export function fetchViewers(cb: (err: Error | null, rows?: any[]) => void) {
-  db.all('SELECT id, platform, platform_key, last_active_time FROM viewers', [], cb);
+  db.all('SELECT id, name, platform, last_active_time FROM viewers', [], cb);
 }
 
 // Fetch all settings (for UI settings modal)
@@ -114,11 +116,15 @@ export function upsertViewerSetting({ viewer_id, setting_id, value }: { viewer_i
 // Register a listener for chat messages from the chatBus
 export function registerChatBusDbListener() {
   chatBus.onChatMessage((event: ChatMessageEvent) => {
-    // Upsert viewer on every chat message
+    // Use a 12-character truncated SHA-256 hash for viewer ID (safe, compact, and unique for this use case)
+    const platformUserId = event.tags?.['user-id'] || event.user;
+    const platform = event.platform;
+    const viewerKey = require('crypto').createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
     upsertViewer({
-      id: event.tags?.['user-id'] || '',
+      id: viewerKey,
+      name: event.user,
       platform: event.platform,
-      platform_key: event.user,
+      platform_key: platformUserId,
       last_active_time: event.time,
     });
     insertChatMessage({
