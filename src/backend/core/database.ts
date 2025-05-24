@@ -39,7 +39,8 @@ export function initDatabase() {
     viewer_id TEXT NOT NULL,            -- Foreign key to viewers.id
     key TEXT NOT NULL,                  -- Setting name (e.g., 'role', 'tts_disabled', 'voice')
     value TEXT,                         -- Setting value
-    FOREIGN KEY (viewer_id) REFERENCES viewers(id)
+    FOREIGN KEY (viewer_id) REFERENCES viewers(id),
+    UNIQUE(viewer_id, key)
   )`);
 }
 
@@ -72,6 +73,31 @@ export function deleteChatMessageById(id: number, cb: (err: Error | null) => voi
   db.run('DELETE FROM chat_messages WHERE id = ?', [id], cb);
 }
 
+// Ensure default settings for a viewer
+export function ensureDefaultViewerSettings(viewerId: string, cb: (err: Error | null) => void) {
+  // Check if each setting exists, insert if not
+  const defaults = [
+    { key: 'tts_disabled', value: 'false' },
+    { key: 'role', value: 'viewer' },
+    { key: 'voice', value: '' },
+  ];
+  let remaining = defaults.length;
+  let error: Error | null = null;
+  defaults.forEach(({ key, value }) => {
+    db.get('SELECT 1 FROM settings WHERE viewer_id = ? AND key = ?', [viewerId, key], (err1, row) => {
+      if (err1) error = err1;
+      if (!row) {
+        db.run('INSERT INTO settings (viewer_id, key, value) VALUES (?, ?, ?)', [viewerId, key, value], err2 => {
+          if (err2) error = err2;
+          if (--remaining === 0) cb(error);
+        });
+      } else {
+        if (--remaining === 0) cb(error);
+      }
+    });
+  });
+}
+
 // Upsert a viewer (insert if new, update last_active_time if exists)
 export function upsertViewer({ id, name, platform, platform_key, last_active_time }: { id: string, name: string, platform: string, platform_key: string, last_active_time: string }, cb?: (err: Error | null) => void) {
   db.run(
@@ -79,7 +105,12 @@ export function upsertViewer({ id, name, platform, platform_key, last_active_tim
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET last_active_time=excluded.last_active_time` ,
     [id, name, platform, platform_key, last_active_time],
-    cb || (() => {})
+    (err) => {
+      if (!err) {
+        ensureDefaultViewerSettings(id, () => {});
+      }
+      if (cb) cb(err);
+    }
   );
 }
 
@@ -93,22 +124,22 @@ export function fetchSettings(cb: (err: Error | null, rows?: any[]) => void) {
   db.all('SELECT * FROM settings', [], cb);
 }
 
-// Fetch all settings for a given viewer (viewer_settings + settings join)
+// Fetch all settings for a given viewer (settings table only)
 export function fetchViewerSettings(viewerId: string, cb: (err: Error | null, rows?: any[]) => void) {
-  db.all(`
-    SELECT vs.id, vs.setting_id, vs.value, s.name, s.type, s.default_value
-    FROM settings s
-    LEFT JOIN viewer_settings vs ON vs.setting_id = s.id AND vs.viewer_id = ?
-  `, [viewerId], cb);
+  db.all(
+    'SELECT id, key, value FROM settings WHERE viewer_id = ?',
+    [viewerId],
+    cb
+  );
 }
 
 // Upsert a viewer setting (insert or update value)
-export function upsertViewerSetting({ viewer_id, setting_id, value }: { viewer_id: string, setting_id: string, value: string | null }, cb: (err: Error | null) => void) {
+export function upsertViewerSetting({ viewer_id, key, value }: { viewer_id: string, key: string, value: string | null }, cb: (err: Error | null) => void) {
   db.run(
-    `INSERT INTO viewer_settings (id, viewer_id, setting_id, value)
-     VALUES (lower(hex(randomblob(16))), ?, ?, ?)
-     ON CONFLICT(viewer_id, setting_id) DO UPDATE SET value=excluded.value`,
-    [viewer_id, setting_id, value],
+    `INSERT INTO settings (viewer_id, key, value)
+     VALUES (?, ?, ?)
+     ON CONFLICT(viewer_id, key) DO UPDATE SET value=excluded.value`,
+    [viewer_id, key, value],
     cb
   );
 }

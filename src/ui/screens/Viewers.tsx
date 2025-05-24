@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import voicesJson from '../assets/pollyVoiceEngines.sorted.json';
 
 // Use the preload-exposed ipcRenderer for secure IPC
 const ipcRenderer = window.electronAPI?.ipcRenderer;
@@ -10,12 +11,12 @@ interface Viewer {
   lastActive: string;
 }
 
+// Fix Setting type to match backend: id, viewer_id, key, value
 interface Setting {
   id: string;
-  name: string;
-  description: string;
-  type: string;
-  default_value: string | null;
+  viewer_id: string;
+  key: string;
+  value: string;
 }
 
 interface ViewerSetting {
@@ -32,6 +33,8 @@ const Viewers: React.FC = () => {
   const [settings, setSettings] = useState<Setting[]>([]);
   const [viewerSettings, setViewerSettings] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [ttsFilter, setTtsFilter] = useState('');
 
   // Fetch viewers and settings on mount
   useEffect(() => {
@@ -58,9 +61,9 @@ const Viewers: React.FC = () => {
     setModalOpen(true);
     setLoading(true);
     if (!ipcRenderer) return;
-    ipcRenderer.invoke('fetchViewerSettings', viewer.id).then((data: ViewerSetting[]) => {
+    ipcRenderer.invoke('fetchViewerSettings', viewer.id).then((data: any[]) => {
       const map: Record<string, string | null> = {};
-      data.forEach(vs => { map[vs.setting_id] = vs.value; });
+      data.forEach(vs => { map[vs.key] = vs.value; });
       setViewerSettings(map);
       setLoading(false);
     });
@@ -70,10 +73,17 @@ const Viewers: React.FC = () => {
   const handleSave = async () => {
     if (!ipcRenderer || !selectedViewer) return;
     setLoading(true);
-    await ipcRenderer.invoke('updateViewerSettings', selectedViewer.id, viewerSettings);
+    // Always upsert all settings in the model, not just those that exist in DB
+    const allSettings = [
+      { key: 'tts_disabled', value: viewerSettings['tts_disabled'] ?? 'false' },
+      { key: 'role', value: viewerSettings['role'] ?? 'viewer' },
+      { key: 'voice', value: viewerSettings['voice'] ?? '' },
+    ];
+    for (const s of allSettings) {
+      await ipcRenderer.invoke('updateViewerSettings', selectedViewer.id, { [s.key]: s.value });
+    }
     setLoading(false);
     setModalOpen(false);
-    // Optionally, refresh viewers/settings if needed
   };
 
   // Delete a viewer and their settings
@@ -86,11 +96,31 @@ const Viewers: React.FC = () => {
     setLoading(false);
   };
 
-  const filteredViewers = viewers.filter(v =>
-    v.name?.toLowerCase().includes(search.toLowerCase()) ||
-    v.id?.toLowerCase().includes(search.toLowerCase()) ||
-    v.platform?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Prepare voices for dropdown, ensure only one Not Set
+  const voices = voicesJson.filter(v => v.Name).map(v => ({ Name: v.Name, LanguageName: v.LanguageName }));
+  voices.unshift({ Name: '', LanguageName: 'Not Set' });
+
+  const filteredViewers = useMemo(() => {
+    // Build a map of settings for each viewer
+    const settingsMap: Record<string, Record<string, string>> = {};
+    settings.forEach(s => {
+      if (!settingsMap[s.viewer_id]) settingsMap[s.viewer_id] = {};
+      settingsMap[s.viewer_id][s.key] = s.value;
+    });
+    return viewers.filter(v => {
+      // Text search (name, platform, etc.)
+      const matchesText = v.name.toLowerCase().includes(search.toLowerCase()) ||
+        v.platform.toLowerCase().includes(search.toLowerCase()) ||
+        v.id.toLowerCase().includes(search.toLowerCase());
+      // Get settings for this viewer
+      const viewerSettings = settingsMap[v.id] || {};
+      // Role filter
+      const matchesRole = !roleFilter || viewerSettings['role'] === roleFilter;
+      // TTS Disabled filter
+      const matchesTts = !ttsFilter || viewerSettings['tts_disabled'] === ttsFilter;
+      return matchesText && matchesRole && matchesTts;
+    });
+  }, [viewers, settings, search, roleFilter, ttsFilter]);
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', color: '#fff' }}>
@@ -103,6 +133,19 @@ const Viewers: React.FC = () => {
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff' }}
         />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+          <option value="">All Roles</option>
+          <option value="viewer">Viewer</option>
+          <option value="moderator">Moderator</option>
+          <option value="super_moderator">Super Moderator</option>
+        </select>
+        <select value={ttsFilter} onChange={e => setTtsFilter(e.target.value)}>
+          <option value="">All TTS</option>
+          <option value="false">TTS Enabled</option>
+          <option value="true">TTS Disabled</option>
+        </select>
       </div>
       <table style={{ width: '100%', background: '#23272b', borderRadius: 8, borderCollapse: 'collapse' }}>
         <thead style={{ background: '#181c20' }}>
@@ -155,44 +198,43 @@ const Viewers: React.FC = () => {
             <h3 style={{ marginTop: 0 }}>Edit Settings for {selectedViewer.name}</h3>
             <div style={{ margin: '24px 0', color: '#aaa' }}>
               {loading ? <div>Loading...</div> : (
-                <form>
-                  {settings.map(setting => (
-                    <div key={setting.id} style={{ marginBottom: 18 }}>
-                      <label style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>{setting.name}</label>
-                      {setting.type === 'boolean' ? (
-                        <input
-                          type="checkbox"
-                          checked={viewerSettings[setting.id] === 'true'}
-                          onChange={e => setViewerSettings({ ...viewerSettings, [setting.id]: e.target.checked ? 'true' : 'false' })}
-                        />
-                      ) : setting.name === 'Role' ? (
-                        <select
-                          value={viewerSettings[setting.id] || setting.default_value || 'Viewer'}
-                          onChange={e => setViewerSettings({ ...viewerSettings, [setting.id]: e.target.value })}
-                        >
-                          <option value="Viewer">Viewer</option>
-                          <option value="Mod">Mod</option>
-                          <option value="Super Mod">Super Mod</option>
-                        </select>
-                      ) : setting.name === 'TTS Voice' ? (
-                        <input
-                          type="text"
-                          placeholder="(default)"
-                          value={viewerSettings[setting.id] || ''}
-                          onChange={e => setViewerSettings({ ...viewerSettings, [setting.id]: e.target.value })}
-                        />
-                        // TODO: Replace with dropdown of voices from pollyVoiceEngines.sorted.json
-                      ) : (
-                        <input
-                          type="text"
-                          value={viewerSettings[setting.id] || ''}
-                          onChange={e => setViewerSettings({ ...viewerSettings, [setting.id]: e.target.value })}
-                        />
-                      )}
-                      <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{setting.description}</div>
+                settings.length > 0 && (
+                  <form>
+                    {/* TTS Disabled */}
+                    <div style={{ marginBottom: 18 }}>
+                      <label style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>TTS Disabled</label>
+                      <input
+                        type="checkbox"
+                        checked={viewerSettings['tts_disabled'] === 'true'}
+                        onChange={e => setViewerSettings({ ...viewerSettings, ['tts_disabled']: e.target.checked ? 'true' : 'false' })}
+                      />
                     </div>
-                  ))}
-                </form>
+                    {/* Role */}
+                    <div style={{ marginBottom: 18 }}>
+                      <label style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Role</label>
+                      <select
+                        value={viewerSettings['role'] || 'viewer'}
+                        onChange={e => setViewerSettings({ ...viewerSettings, ['role']: e.target.value })}
+                      >
+                        <option value="viewer">Viewer</option>
+                        <option value="moderator">Moderator</option>
+                        <option value="super_moderator">Super Moderator</option>
+                      </select>
+                    </div>
+                    {/* Voice */}
+                    <div style={{ marginBottom: 18 }}>
+                      <label style={{ display: 'block', fontWeight: 500, marginBottom: 4 }}>Voice</label>
+                      <select
+                        value={viewerSettings['voice'] || ''}
+                        onChange={e => setViewerSettings({ ...viewerSettings, ['voice']: e.target.value })}
+                      >
+                        {voices.map(v => (
+                          <option key={v.Name} value={v.Name}>{v.Name ? `${v.Name} (${v.LanguageName})` : 'Not Set'}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </form>
+                )
               )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

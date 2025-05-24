@@ -318,10 +318,10 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('updateViewerSettings', async (_event, viewerId, settings) => {
-    // settings: { [setting_id]: value }
-    return Promise.all(Object.entries(settings).map(([setting_id, value]) =>
+    // settings: { [key]: value }
+    return Promise.all(Object.entries(settings).map(([key, value]) =>
       new Promise((resolve, reject) => {
-        upsertViewerSetting({ viewer_id: viewerId, setting_id, value: value as string | null }, err => {
+        upsertViewerSetting({ viewer_id: viewerId, key, value: value as string | null }, err => {
           if (err) reject(err.message);
           else resolve(true);
         });
