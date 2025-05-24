@@ -47,6 +47,7 @@ const TTS: React.FC = () => {
     // Collapse if all required fields are present, else expand
     return !!(accessKeyId && secretAccessKey && region);
   });
+  const [ttsQueueLength, setTtsQueueLength] = useState<number>(0);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -228,6 +229,44 @@ const TTS: React.FC = () => {
     setSelectedVoice(e.target.value);
   };
 
+  // Handler for test voice
+  const handleTestVoice = async () => {
+    setTtsStatus(null);
+    try {
+      const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
+        text: 'This is a test of Amazon Polly.',
+        voiceId: selectedVoice,
+        engine: sortedVoices.find((v: PollyVoiceSorted) => v.Name === selectedVoice)?.Engines[0],
+      });
+      const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
+      const audio = new Audio(dataUrl);
+      audio.play();
+      setTtsStatus('Test voice played!');
+      setTimeout(() => setTtsStatus(null), 2000);
+    } catch (err) {
+      setTtsStatus('Failed to play test voice');
+      setTimeout(() => setTtsStatus(null), 2000);
+    }
+  };
+
+  // Listen for TTS queue updates
+  useEffect(() => {
+    let isMounted = true;
+    // Initial fetch
+    window.electron.ipcRenderer.invoke('tts:queueStatus').then((res: { length: number }) => {
+      if (isMounted && res && typeof res.length === 'number') setTtsQueueLength(res.length);
+    });
+    // Listen for live updates
+    const handler = (_event: any, length: number) => {
+      if (isMounted) setTtsQueueLength(length);
+    };
+    window.electron.ipcRenderer.on('tts:queueChanged', handler);
+    return () => {
+      isMounted = false;
+      window.electron.ipcRenderer.removeAllListeners('tts:queueChanged');
+    };
+  }, []);
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
       {/* Help Modal */}
@@ -400,24 +439,7 @@ const TTS: React.FC = () => {
         )}
         <button
           style={{ marginTop: 8, background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={async () => {
-            setTtsStatus(null);
-            try {
-              const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
-                text: 'This is a test of Amazon Polly.',
-                voiceId: selectedVoice,
-                engine: sortedVoices.find((v: PollyVoiceSorted) => v.Name === selectedVoice)?.Engines[0],
-              });
-              const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
-              const audio = new Audio(dataUrl);
-              audio.play();
-              setTtsStatus('Test voice played!');
-              setTimeout(() => setTtsStatus(null), 2000);
-            } catch (err) {
-              setTtsStatus('Failed to play test voice');
-              setTimeout(() => setTtsStatus(null), 2000);
-            }
-          }}
+          onClick={handleTestVoice}
           disabled={!selectedVoice || sortedVoices.length === 0}
         >
           Test Voice
@@ -450,6 +472,11 @@ const TTS: React.FC = () => {
         >
           Clear TTS Backlog
         </button>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <span style={{ color: '#aaa', fontSize: 15 }}>
+          TTS Queue: <b>{ttsQueueLength}</b> message{ttsQueueLength === 1 ? '' : 's'} waiting
+        </span>
       </div>
     </div>
   );

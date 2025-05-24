@@ -296,6 +296,14 @@ app.whenReady().then(async () => {
     }
   });
 
+  // --- Forward TTS queueChanged events to renderer ---
+  ttsQueue.on('queueChanged', (length: number) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && win.webContents) {
+      win.webContents.send('tts:queueChanged', length);
+    }
+  });
+
   // Only create the window after all handlers are registered
   createWindow();
 });

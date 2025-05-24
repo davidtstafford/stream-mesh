@@ -17,6 +17,7 @@ class TTSQueue extends EventEmitter {
   private stopRequested = false;
 
   enqueue(item: TTSQueueItem) {
+    // Add to the end of the queue (FIFO)
     this.queue.push(item);
     this.emit('queueChanged', this.queue.length);
     this.processQueue();
@@ -36,6 +37,8 @@ class TTSQueue extends EventEmitter {
     if (this.isPlaying || this.queue.length === 0) return;
     this.isPlaying = true;
     while (this.queue.length > 0 && !this.stopRequested) {
+      // Remove from the front of the queue (FIFO)
+      this.emit('queueChanged', this.queue.length - 1); // Emit before playback to update UI immediately
       const item = this.queue.shift()!;
       try {
         const config = getPollyConfig();
@@ -47,6 +50,8 @@ class TTSQueue extends EventEmitter {
       } catch (err) {
         this.emit('error', err);
       }
+      // Optionally, emit again after playback if you want to distinguish between 'waiting' and 'spoken'
+      // this.emit('queueChanged', this.queue.length);
     }
     this.isPlaying = false;
     this.stopRequested = false;
