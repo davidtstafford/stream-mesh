@@ -8,6 +8,7 @@ import { startTwitchOAuth } from './backend/services/twitchOAuth';
 import { chatBus } from './backend/services/chatBus';
 import { registerChatBusDbListener } from './backend/core/database';
 import fs from 'fs';
+import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -169,6 +170,35 @@ app.whenReady().then(async () => {
       console.error('Twitch OAuth error:', err);
       throw err;
     }
+  });
+
+  // Polly IPC handlers
+  ipcMain.handle('polly:configure', async (_event, config) => {
+    configurePolly(config);
+    return true;
+  });
+
+  ipcMain.handle('polly:getConfig', async () => {
+    return getPollyConfig();
+  });
+
+  ipcMain.handle('polly:speak', async (_event, { text, voiceId, engine }) => {
+    return synthesizeSpeech(text, voiceId, engine);
+  });
+
+  ipcMain.handle('polly:listVoices', async () => {
+    try {
+      const voices = await (await import('./backend/services/awsPolly')).listPollyVoices();
+      return { voices };
+    } catch (err) {
+      return { voices: [], error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('polly:getAudioDataUrl', async (_event, filePath: string) => {
+    const data = fs.readFileSync(filePath);
+    const base64 = data.toString('base64');
+    return `data:audio/mp3;base64,${base64}`;
   });
 
   // Only create the window after all handlers are registered
