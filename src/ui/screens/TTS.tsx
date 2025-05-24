@@ -30,7 +30,8 @@ const TTS: React.FC = () => {
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [region, setRegion] = useState('');
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [pollyStatus, setPollyStatus] = useState<string | null>(null);
+  const [ttsStatus, setTtsStatus] = useState<string | null>(null);
   const [voices, setVoices] = useState<PollyVoiceSorted[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
   const [selectedEngine, setSelectedEngine] = useState('');
@@ -42,6 +43,10 @@ const TTS: React.FC = () => {
   const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
   const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [pollyCollapsed, setPollyCollapsed] = useState(() => {
+    // Collapse if all required fields are present, else expand
+    return !!(accessKeyId && secretAccessKey && region);
+  });
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -71,7 +76,7 @@ const TTS: React.FC = () => {
         setVoices(result.voices || []);
         setVoicesLoaded(true);
       } catch (err) {
-        setStatus('Could not fetch Polly voices');
+        setPollyStatus('Could not fetch Polly voices');
         setVoicesLoaded(true);
       }
     };
@@ -141,7 +146,8 @@ const TTS: React.FC = () => {
     }
   }, [sortedVoices, selectedVoice]);
 
-  const handleSave = async () => {
+  // Save only Polly config
+  const handleSavePolly = async () => {
     if (!pollyConfig) return;
     setSaving(true);
     const newConfig = {
@@ -155,22 +161,51 @@ const TTS: React.FC = () => {
     await window.electron.ipcRenderer.invoke('polly:configure', newConfig);
     setPollyConfig(newConfig);
     setSaving(false);
-    setStatus('Saved!');
+    setPollyStatus('Polly config saved!');
+    setTimeout(() => setPollyStatus(null), 2000);
   };
 
-  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedVoice(e.target.value);
+  // Save only TTS settings (global)
+  const handleSaveTTS = async () => {
+    setSaving(true);
+    await window.electron.ipcRenderer.invoke('tts:setSettings', {
+      enabled: ttsEnabled,
+      readNameBeforeMessage,
+      includePlatformWithName
+    });
+    // Save selected voice/engine as well
+    if (accessKeyId && secretAccessKey && region && selectedVoice && selectedEngine) {
+      await window.electron.ipcRenderer.invoke('polly:configure', {
+        accessKeyId,
+        secretAccessKey,
+        region,
+        voiceId: selectedVoice,
+        engine: selectedEngine,
+      });
+    }
+    setSaving(false);
+    setTtsStatus('TTS settings saved!');
+    setTimeout(() => setTtsStatus(null), 2000);
   };
+
+  // Helper for opening the local file in a modal (in-app)
+  const openTTSGuide = () => {
+    setShowHelp(true);
+  };
+
+  // Update collapse state if config changes
+  React.useEffect(() => {
+    if (accessKeyId && secretAccessKey && region) {
+      setPollyCollapsed(true);
+    } else {
+      setPollyCollapsed(false);
+    }
+  }, [accessKeyId, secretAccessKey, region]);
 
   // Handler for toggling TTS enabled
   const handleToggleTts = async () => {
     const newEnabled = !ttsEnabled;
     setTtsEnabled(newEnabled);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', {
-      enabled: newEnabled,
-      readNameBeforeMessage,
-      includePlatformWithName
-    });
   };
 
   // Handler for toggling readNameBeforeMessage
@@ -180,27 +215,17 @@ const TTS: React.FC = () => {
     // If disabling, also disable includePlatformWithName
     const newIncludePlatform = newValue ? includePlatformWithName : false;
     setIncludePlatformWithName(newIncludePlatform);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', {
-      enabled: ttsEnabled,
-      readNameBeforeMessage: newValue,
-      includePlatformWithName: newIncludePlatform
-    });
   };
 
   // Handler for toggling includePlatformWithName
   const handleToggleIncludePlatform = async () => {
     const newValue = !includePlatformWithName;
     setIncludePlatformWithName(newValue);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', {
-      enabled: ttsEnabled,
-      readNameBeforeMessage,
-      includePlatformWithName: newValue
-    });
   };
 
-  // Helper for opening the local file in a modal (in-app)
-  const openTTSGuide = () => {
-    setShowHelp(true);
+  // Handler for changing voice
+  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedVoice(e.target.value);
   };
 
   return (
@@ -254,6 +279,67 @@ const TTS: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Amazon Polly (Cloud TTS) - REQUIRED section */}
+      <div style={{
+        marginBottom: 24,
+        border: '1px solid #444',
+        borderRadius: 8,
+        background: '#23272e',
+        boxShadow: '0 2px 8px #0002',
+        position: 'relative',
+      }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            padding: '12px 16px',
+            borderBottom: pollyCollapsed ? 'none' : '1px solid #444',
+            background: '#23272e',
+            borderTopLeftRadius: 8,
+            borderTopRightRadius: 8,
+          }}
+          onClick={() => setPollyCollapsed(c => !c)}
+        >
+          <span style={{ fontWeight: 'bold', fontSize: 18, color: '#00bfff', flex: 1 }}>
+            Amazon Polly (Cloud TTS) <span style={{ color: '#ff4d4f', fontWeight: 600 }}>*</span>
+          </span>
+          <span style={{ color: '#aaa', fontSize: 14, marginRight: 12 }}>
+            {pollyCollapsed ? 'Show' : 'Hide'}
+          </span>
+          <span style={{ fontSize: 22, color: '#aaa' }}>{pollyCollapsed ? '+' : '–'}</span>
+        </div>
+        {!pollyCollapsed && (
+          <div style={{ padding: 16 }}>
+            <div style={{ color: '#ff4d4f', fontWeight: 500, marginBottom: 8 }}>
+              Amazon Polly setup is <b>required</b> for TTS to work.
+            </div>
+            <div style={{ color: '#aaa', marginBottom: 12 }}>
+              Enter your AWS credentials and region to enable Text-to-Speech. This is a one-time setup.
+            </div>
+            <input placeholder="Access Key ID" value={accessKeyId} onChange={e => setAccessKeyId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
+            <input placeholder="Secret Access Key" type="password" value={secretAccessKey} onChange={e => setSecretAccessKey(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
+            <input placeholder="AWS Region (e.g. us-east-1)" value={region} onChange={e => setRegion(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
+            <button onClick={handleSavePolly} disabled={saving} style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}>{saving ? 'Saving...' : 'Save Polly Config'}</button>
+            {pollyStatus && <div style={{ color: pollyStatus === 'Polly config saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{pollyStatus}</div>}
+            <div style={{ marginTop: 12 }}>
+              <span
+                onClick={openTTSGuide}
+                style={{ color: '#00bfff', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}
+                title="Open the TTS setup guide"
+              >
+                Need help? See the TTS setup guide
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Visual cue if incomplete */}
+        {(!accessKeyId || !secretAccessKey || !region) && pollyCollapsed && (
+          <div style={{ color: '#ff4d4f', fontSize: 13, padding: '0 16px 12px 16px' }}>
+            <b>Required:</b> Please complete Amazon Polly setup above to enable TTS.
+          </div>
+        )}
+      </div>
       <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>TTS Settings</h2>
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
@@ -315,7 +401,7 @@ const TTS: React.FC = () => {
         <button
           style={{ marginTop: 8, background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
           onClick={async () => {
-            setStatus(null);
+            setTtsStatus(null);
             try {
               const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
                 text: 'This is a test of Amazon Polly.',
@@ -325,44 +411,40 @@ const TTS: React.FC = () => {
               const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
               const audio = new Audio(dataUrl);
               audio.play();
-              setStatus('Test voice played!');
+              setTtsStatus('Test voice played!');
+              setTimeout(() => setTtsStatus(null), 2000);
             } catch (err) {
-              setStatus('Failed to play test voice');
+              setTtsStatus('Failed to play test voice');
+              setTimeout(() => setTtsStatus(null), 2000);
             }
           }}
           disabled={!selectedVoice || sortedVoices.length === 0}
         >
           Test Voice
         </button>
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4, display: 'flex', alignItems: 'center' }}>
-          Amazon Polly (Cloud TTS)
-          <span
-            onClick={openTTSGuide}
-            style={{ marginLeft: 8, color: '#00bfff', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}
-            title="Open the TTS setup guide"
-          >
-            Need help? See the TTS setup guide
-          </span>
-        </div>
-        <input placeholder="Access Key ID" value={accessKeyId} onChange={e => setAccessKeyId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
-        <input placeholder="Secret Access Key" type="password" value={secretAccessKey} onChange={e => setSecretAccessKey(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
-        <input placeholder="AWS Region (e.g. us-east-1)" value={region} onChange={e => setRegion(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
-        <button onClick={handleSave} disabled={saving} style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}>{saving ? 'Saving...' : 'Save'}</button>
-        {status && <div style={{ color: status === 'Saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{status}</div>}
+        {ttsStatus && <div style={{ color: ttsStatus === 'Test voice played!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{ttsStatus}</div>}
       </div>
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
       <div style={{ marginTop: 24 }}>
         <button
-          style={{ background: '#ff4d4f', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
+          style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
+          onClick={handleSaveTTS}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save TTS Settings'}
+        </button>
+        {ttsStatus && <div style={{ color: ttsStatus === 'TTS settings saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{ttsStatus}</div>}
+        <button
+          style={{ background: '#ff4d4f', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4, marginLeft: 16 }}
           onClick={async () => {
-            setStatus(null);
+            setTtsStatus(null);
             try {
               await window.electron.ipcRenderer.invoke('tts:clearQueue');
-              setStatus('TTS backlog cleared!');
+              setTtsStatus('TTS backlog cleared!');
+              setTimeout(() => setTtsStatus(null), 2000);
             } catch (err) {
-              setStatus('Failed to clear TTS backlog');
+              setTtsStatus('Failed to clear TTS backlog');
+              setTimeout(() => setTtsStatus(null), 2000);
             }
           }}
         >
