@@ -1,5 +1,5 @@
 // Main Electron process
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById } from './backend/core/database';
@@ -247,6 +247,23 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('tts:queueStatus', async () => {
     return { length: ttsQueue.getQueueLength() };
+  });
+
+  // Register IPC handler to open a local file
+  ipcMain.handle('open-local-file', async (_event, relativePath: string) => {
+    try {
+      // Resolve relative to the app root (handles both dev and packaged)
+      let basePath = isDev ? process.cwd() : process.resourcesPath;
+      // Remove leading slashes if present
+      if (relativePath.startsWith('/') || relativePath.startsWith('\\')) {
+        relativePath = relativePath.replace(/^[/\\]+/, '');
+      }
+      const absPath = path.join(basePath, relativePath);
+      await shell.openPath(absPath);
+      return true;
+    } catch (err) {
+      return false;
+    }
   });
 
   // Listen to chatBus and enqueue chat messages for TTS

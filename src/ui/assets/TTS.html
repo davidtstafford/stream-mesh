@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Amazon Polly Setup for StreamMesh TTS</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #23272e; color: #fff; margin: 0; padding: 24px; }
+    h1, h2, h3 { color: #00bfff; }
+    a { color: #00bfff; }
+    code, pre { background: #181a1b; color: #ffecb3; padding: 2px 4px; border-radius: 3px; }
+    ul, ol { margin-left: 1.5em; }
+    .section { margin-bottom: 1.5em; }
+    hr { border: 0; border-top: 1px solid #444; margin: 2em 0; }
+  </style>
+</head>
+<body>
+  <h1>Amazon Polly Setup for StreamMesh TTS</h1>
+  <div class="section">
+    StreamMesh supports Amazon Polly for high-quality Text-to-Speech (TTS) voices. This guide explains how to set up your own AWS account, create credentials, and enable Polly voices in the app.
+  </div>
+  <div class="section">
+    <h2>1. Create an AWS Account</h2>
+    <ul>
+      <li>Go to <a href="https://aws.amazon.com/" target="_blank">aws.amazon.com</a> and sign up for a free account if you don't have one.</li>
+    </ul>
+  </div>
+  <div class="section">
+    <h2>2. Create an IAM User for Polly</h2>
+    <ol>
+      <li>Visit the <a href="https://console.aws.amazon.com/iam/" target="_blank">AWS IAM Console</a>.</li>
+      <li>Click <b>Users</b> in the sidebar, then click <b>Create user</b>.</li>
+      <li>Enter a username (e.g., <code>streammesh-tts</code>).</li>
+      <li>Click <b>Next</b>.</li>
+      <li>Under <b>Set permissions</b>, choose <b>Attach policies directly</b>.</li>
+      <li>Search for and select the policy: <code>AmazonPollyReadOnlyAccess</code> (recommended) or <code>AmazonPollyFullAccess</code> (if you need more permissions).</li>
+      <li>Click <b>Next</b> and then <b>Create user</b>.</li>
+      <li>On the new user's summary page, scroll to the <b>Access keys</b> section.</li>
+      <li>Click <b>Create access key</b>.</li>
+      <li>When prompted for the use case, select <b>Application running outside AWS</b>.</li>
+      <li>Click through the prompts. When the key is created, you will see the <b>Access Key ID</b> and <b>Secret Access Key</b>. <b>Copy or download these now</b>—this is the only time you will see the secret key.</li>
+    </ol>
+  </div>
+  <div class="section">
+    <h2>3. Enable Polly in StreamMesh</h2>
+    <ol>
+      <li>Open StreamMesh and go to <b>Admin &gt; TTS</b>.</li>
+      <li>Find the <b>Amazon Polly</b> section.</li>
+      <li>Enter your <b>Access Key ID</b>, <b>Secret Access Key</b>, and <b>AWS Region</b> (e.g., <code>us-east-1</code>).</li>
+      <li>Click <b>Save</b>.</li>
+    </ol>
+  </div>
+  <div class="section">
+    <h2>4. Select a Polly Voice</h2>
+    <ul>
+      <li>After saving your keys, the app will fetch available Polly voices.</li>
+      <li>Choose your preferred voice from the list.</li>
+    </ul>
+  </div>
+  <div class="section">
+    <h2>5. Privacy &amp; Security</h2>
+    <ul>
+      <li>Your AWS keys are stored securely on your device and never sent to StreamMesh servers.</li>
+      <li>You are responsible for your AWS usage and costs. See <a href="https://aws.amazon.com/polly/pricing/" target="_blank">Polly pricing</a>.</li>
+    </ul>
+  </div>
+  <div class="section">
+    <h2>6. Troubleshooting</h2>
+    <ul>
+      <li>If voices do not appear, double-check your keys and region.</li>
+      <li>Make sure your IAM user has Polly permissions.</li>
+      <li>Check your AWS usage limits if you hit errors.</li>
+    </ul>
+  </div>
+  <div class="section">
+    <h2>7. More Info</h2>
+    <ul>
+      <li><a href="https://docs.aws.amazon.com/polly/" target="_blank">Amazon Polly Documentation</a></li>
+      <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users.html" target="_blank">AWS IAM User Guide</a></li>
+    </ul>
+  </div>
+  <hr />
+  <div style="color:#aaa; font-size: 0.95em;">
+    For questions or help, join the StreamMesh community or open an issue on GitHub.
+  </div>
+</body>
+</html>

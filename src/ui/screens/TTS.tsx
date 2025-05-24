@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import pollyVoiceEngines from '../assets/pollyVoiceEngines.json';
+import pollyVoiceEnginesSorted from '../assets/pollyVoiceEngines.sorted.json';
 
 // PollyConfig type (copy from backend)
 interface PollyConfig {
@@ -10,16 +10,13 @@ interface PollyConfig {
   engine?: string;
 }
 
-// Extend the voice type to include SupportedEngines
-interface PollyVoice {
-  Id: string;
+// Remove all engineMap references and use the new array-based structure
+export interface PollyVoiceSorted {
   Name: string;
   LanguageName: string;
-  SupportedEngines: string[];
+  LanguageCode: string;
+  Engines: string[];
 }
-
-// Type assertion for imported JSON
-const engineMap = pollyVoiceEngines as Record<string, string[]>;
 
 // Utility to convert Windows path to file URL
 function toFileUrl(filePath: string) {
@@ -34,7 +31,7 @@ const TTS: React.FC = () => {
   const [region, setRegion] = useState('');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [voices, setVoices] = useState<PollyVoice[]>([]);
+  const [voices, setVoices] = useState<PollyVoiceSorted[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
   const [selectedEngine, setSelectedEngine] = useState('');
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -44,6 +41,7 @@ const TTS: React.FC = () => {
   const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
   const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
   const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -100,11 +98,11 @@ const TTS: React.FC = () => {
     setSelectedVoice(prev => {
       if (prev && voices.some(v => v.Name === prev)) return prev;
       if (pollyConfig && pollyConfig.voiceId && voices.some(v => v.Name === pollyConfig.voiceId)) {
-        setSelectedEngine(engineMap[pollyConfig.voiceId][0]);
+        setSelectedEngine(voices.find(v => v.Name === pollyConfig.voiceId)?.Engines[0] || '');
         return pollyConfig.voiceId;
       }
       if (voices.length > 0) {
-        setSelectedEngine(engineMap[voices[0].Name][0]);
+        setSelectedEngine(voices[0].Engines[0]);
         return voices[0].Name;
       }
       return '';
@@ -124,15 +122,24 @@ const TTS: React.FC = () => {
     }
   }, [accessKeyId, secretAccessKey, region, selectedVoice, selectedEngine]);
 
-  // Only show voices that are in the mapping
-  const filteredVoices = voices.filter(v => engineMap[v.Name]);
+  // Use the new sorted JSON for the voice list
+  const sortedVoices: PollyVoiceSorted[] = pollyVoiceEnginesSorted as PollyVoiceSorted[];
 
-  // When selectedVoice changes, always use the first mapped engine
+  // When selectedVoice changes, update selectedEngine to the first engine in the selected voice's Engines array
   useEffect(() => {
-    if (selectedVoice && engineMap[selectedVoice]) {
-      setSelectedEngine(engineMap[selectedVoice][0]);
+    if (!selectedVoice) return;
+    const found = sortedVoices.find(v => v.Name === selectedVoice);
+    if (found && found.Engines.length > 0) {
+      setSelectedEngine(found.Engines[0]);
     }
-  }, [selectedVoice]);
+  }, [selectedVoice, sortedVoices]);
+
+  // Set selectedVoice on initial load if not set
+  useEffect(() => {
+    if (!selectedVoice && sortedVoices.length > 0) {
+      setSelectedVoice(sortedVoices[0].Name);
+    }
+  }, [sortedVoices, selectedVoice]);
 
   const handleSave = async () => {
     if (!pollyConfig) return;
@@ -191,8 +198,62 @@ const TTS: React.FC = () => {
     });
   };
 
+  // Helper for opening the local file in a modal (in-app)
+  const openTTSGuide = () => {
+    setShowHelp(true);
+  };
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
+      {/* Help Modal */}
+      {showHelp && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#23272e',
+            borderRadius: 8,
+            maxWidth: 800,
+            width: '90vw',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 32px #000',
+            position: 'relative',
+          }}>
+            <button
+              onClick={() => setShowHelp(false)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 16,
+                background: 'transparent',
+                color: '#fff',
+                border: 'none',
+                fontSize: 24,
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              title="Close help"
+            >
+              ×
+            </button>
+            <iframe
+              src="/ui/assets/TTS.html"
+              title="TTS Setup Guide"
+              style={{ width: '100%', height: '80vh', border: 'none', borderRadius: 8, background: '#23272e' }}
+            />
+          </div>
+        </div>
+      )}
       <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>TTS Settings</h2>
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
@@ -235,20 +296,20 @@ const TTS: React.FC = () => {
           onChange={handleVoiceChange}
           style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333' }}
         >
-          {filteredVoices.length === 0 ? (
+          {sortedVoices.length === 0 ? (
             <option>Loading voices...</option>
           ) : (
-            filteredVoices.map(v => (
-              <option key={v.Id} value={v.Name}>
+            sortedVoices.map((v: PollyVoiceSorted) => (
+              <option key={v.Name + v.LanguageCode} value={v.Name}>
                 {v.Name} ({v.LanguageName})
               </option>
             ))
           )}
         </select>
         {/* Show engine being used as read-only label */}
-        {selectedVoice && engineMap[selectedVoice] && (
+        {selectedVoice && (
           <div style={{ marginTop: 8, color: '#aaa' }}>
-            Engine: <span style={{ color: '#fff', fontWeight: 'bold' }}>{engineMap[selectedVoice][0]}</span>
+            Engine: <span style={{ color: '#fff', fontWeight: 'bold' }}>{sortedVoices.find((v: PollyVoiceSorted) => v.Name === selectedVoice)?.Engines[0]}</span>
           </div>
         )}
         <button
@@ -258,8 +319,8 @@ const TTS: React.FC = () => {
             try {
               const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
                 text: 'This is a test of Amazon Polly.',
-                voiceId: filteredVoices.find(v => v.Name === selectedVoice)?.Id,
-                engine: engineMap[selectedVoice][0],
+                voiceId: selectedVoice,
+                engine: sortedVoices.find((v: PollyVoiceSorted) => v.Name === selectedVoice)?.Engines[0],
               });
               const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
               const audio = new Audio(dataUrl);
@@ -269,7 +330,7 @@ const TTS: React.FC = () => {
               setStatus('Failed to play test voice');
             }
           }}
-          disabled={!selectedVoice || voices.length === 0}
+          disabled={!selectedVoice || sortedVoices.length === 0}
         >
           Test Voice
         </button>
@@ -277,7 +338,13 @@ const TTS: React.FC = () => {
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 4, display: 'flex', alignItems: 'center' }}>
           Amazon Polly (Cloud TTS)
-          <a href="TTS.MD" style={{ marginLeft: 8, color: '#00bfff', fontSize: 14 }}>Need help? See the TTS setup guide</a>
+          <span
+            onClick={openTTSGuide}
+            style={{ marginLeft: 8, color: '#00bfff', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}
+            title="Open the TTS setup guide"
+          >
+            Need help? See the TTS setup guide
+          </span>
         </div>
         <input placeholder="Access Key ID" value={accessKeyId} onChange={e => setAccessKeyId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />
         <input placeholder="Secret Access Key" type="password" value={secretAccessKey} onChange={e => setSecretAccessKey(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333', marginBottom: 8 }} />

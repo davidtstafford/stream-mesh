@@ -35,7 +35,8 @@ yarn-error.log*
 *.sqlite
 
 # Local auth/cache
-*.json
+# Only ignore root-level .json, not assets
+/*.json
 !package.json
 !tsconfig.json
 
@@ -58,3 +59,5 @@ Desktop.ini
 
 # Ignore Copilot custom instructions
 .github/copilot-instructions.md
+
+/src/ui/assets/TTS.MD
