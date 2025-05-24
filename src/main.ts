@@ -354,7 +354,7 @@ app.whenReady().then(async () => {
     // Generate a unique viewer id as a hash of platform and user id
     const platformUserId = event.tags?.['user-id'] || event.user;
     const platform = event.platform;
-    // Use a 12-character truncated SHA-256 hash for viewer ID (safe, compact, and unique for this use case)
+    const crypto = require('crypto');
     const viewerKey = crypto.createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
     upsertViewer({
       id: viewerKey,
@@ -367,22 +367,38 @@ app.whenReady().then(async () => {
     // Only enqueue if TTS is enabled
     const ttsSettings = loadTTSSettings();
     if (ttsSettings.enabled) {
-      let ttsText = event.message;
-      if (ttsSettings.readNameBeforeMessage && event.user) {
-        let namePart = event.user;
-        if (ttsSettings.includePlatformWithName && event.platform) {
-          namePart = `${event.user} from ${event.platform}`;
+      // Fetch viewer settings synchronously (from DB)
+      fetchViewerSettings(viewerKey, (err, rows) => {
+        let voiceId = undefined;
+        let ttsDisabled = false;
+        if (!err && Array.isArray(rows)) {
+          const voiceSetting = rows.find(r => r.key === 'voice');
+          if (voiceSetting && voiceSetting.value && voiceSetting.value !== '') {
+            voiceId = voiceSetting.value;
+          }
+          const ttsSetting = rows.find(r => r.key === 'tts_disabled');
+          if (ttsSetting && ttsSetting.value === 'true') {
+            ttsDisabled = true;
+          }
         }
-        if (ttsText.trim().endsWith('?')) {
-          ttsText = `${namePart} asks ${ttsText}`;
-        } else {
-          ttsText = `${namePart} says ${ttsText}`;
+        if (ttsDisabled) return; // Do not enqueue if TTS is disabled for this user
+        let ttsText = event.message;
+        if (ttsSettings.readNameBeforeMessage && event.user) {
+          let namePart = event.user;
+          if (ttsSettings.includePlatformWithName && event.platform) {
+            namePart = `${event.user} from ${event.platform}`;
+          }
+          if (ttsText.trim().endsWith('?')) {
+            ttsText = `${namePart} asks ${ttsText}`;
+          } else {
+            ttsText = `${namePart} says ${ttsText}`;
+          }
         }
-      }
-      ttsQueue.enqueue({
-        text: ttsText,
-        user: event.user,
-        // Optionally: voiceId/engine from config or per-user in future
+        ttsQueue.enqueue({
+          text: ttsText,
+          user: event.user,
+          voiceId // If set, will override default
+        });
       });
     }
     // Send live chat message to renderer for real-time update
