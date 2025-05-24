@@ -42,6 +42,7 @@ const TTS: React.FC = () => {
   const [pollyConfig, setPollyConfig] = useState<PollyConfig | null>(null);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
+  const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -82,9 +83,10 @@ const TTS: React.FC = () => {
   // Load TTS settings on mount
   useEffect(() => {
     let isMounted = true;
-    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean }) => {
+    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean }) => {
       if (!isMounted) return;
       setTtsEnabled(!!settings.enabled);
+      setReadNameBeforeMessage(!!settings.readNameBeforeMessage);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -155,7 +157,14 @@ const TTS: React.FC = () => {
   const handleToggleTts = async () => {
     const newEnabled = !ttsEnabled;
     setTtsEnabled(newEnabled);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: newEnabled });
+    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: newEnabled, readNameBeforeMessage });
+  };
+
+  // Handler for toggling readNameBeforeMessage
+  const handleToggleReadName = async () => {
+    const newValue = !readNameBeforeMessage;
+    setReadNameBeforeMessage(newValue);
+    await window.electron.ipcRenderer.invoke('tts:setSettings', { enabled: ttsEnabled, readNameBeforeMessage: newValue });
   };
 
   return (
@@ -173,8 +182,14 @@ const TTS: React.FC = () => {
         </span>
       </div>
       <div style={{ marginBottom: 16 }}>
-        <label><input type="checkbox" /> Read name before message</label>
-        <div style={{ color: '#aaa', marginTop: 4 }}>TTS will only read the message</div>
+        <label>
+          <input type="checkbox" checked={readNameBeforeMessage} onChange={handleToggleReadName} disabled={!ttsSettingsLoaded} /> Read name before message
+        </label>
+        <div style={{ color: '#aaa', marginTop: 4 }}>
+          {readNameBeforeMessage
+            ? 'TTS will say "Alice says ..." or "Alice asks ..." before the message.'
+            : 'TTS will only read the message.'}
+        </div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>

@@ -33,16 +33,22 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
 // TTS global settings (for extensibility)
 interface TTSSettings {
   enabled: boolean;
+  readNameBeforeMessage: boolean;
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
 function loadTTSSettings(): TTSSettings {
   try {
     const data = fs.readFileSync(ttsSettingsFilePath, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    // Backward compatibility: add missing fields
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : false,
+      readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
+    };
   } catch {
-    // Default: TTS off
-    return { enabled: false };
+    // Default: TTS off, no name prefix
+    return { enabled: false, readNameBeforeMessage: false };
   }
 }
 
@@ -246,8 +252,16 @@ app.whenReady().then(async () => {
     // Only enqueue if TTS is enabled
     const ttsSettings = loadTTSSettings();
     if (ttsSettings.enabled) {
+      let ttsText = event.message;
+      if (ttsSettings.readNameBeforeMessage && event.user) {
+        if (ttsText.trim().endsWith('?')) {
+          ttsText = `${event.user} asks ${ttsText}`;
+        } else {
+          ttsText = `${event.user} says ${ttsText}`;
+        }
+      }
       ttsQueue.enqueue({
-        text: event.message,
+        text: ttsText,
         user: event.user,
         // Optionally: voiceId/engine from config or per-user in future
       });
