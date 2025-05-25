@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import pollyVoiceEnginesSorted from '../assets/pollyVoiceEngines.sorted.json';
 import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
+import TTSVoiceSelector from './TTS/TTSVoiceSelector';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
 import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 
@@ -248,32 +249,14 @@ const TTS: React.FC = () => {
       {/* TTS Settings Section (refactored) */}
       <TTSSettingsSection saving={saving} onSave={handleSaveTTS} status={ttsStatus} />
       {/* Voice selection and test controls */}
-      <div style={{ marginTop: 24 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>
-        <select
-          value={selectedVoice}
-          onChange={handleVoiceChange}
-          style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #333' }}
-        >
-          {sortedVoices.length === 0 ? (
-            <option>Loading voices...</option>
-          ) : (
-            sortedVoices.map((v: PollyVoiceSorted) => (
-              <option key={v.Name + v.LanguageCode} value={v.Name}>
-                {v.Name} ({v.LanguageName})
-              </option>
-            ))
-          )}
-        </select>
-        <button
-          style={{ marginTop: 8, background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={handleTestVoice}
-          disabled={!selectedVoice || sortedVoices.length === 0}
-        >
-          Test Voice
-        </button>
-        {ttsStatus && <div style={{ color: ttsStatus === 'Test voice played!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{ttsStatus}</div>}
-      </div>
+      <TTSVoiceSelector
+        voices={sortedVoices}
+        selectedVoice={selectedVoice}
+        onVoiceChange={(voiceId: string) => setSelectedVoice(voiceId)}
+        onTestVoice={handleTestVoice}
+        disabled={saving}
+        status={ttsStatus}
+      />
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
       <div style={{ marginTop: 24 }}>
         <button
