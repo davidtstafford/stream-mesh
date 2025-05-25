@@ -3,6 +3,8 @@ import pollyVoiceEnginesSorted from '../assets/pollyVoiceEngines.sorted.json';
 import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
 import TTSVoiceSelector from './TTS/TTSVoiceSelector';
+import TTSHelpModal from './TTS/TTSHelpModal';
+import TTSQueueManager from './TTS/TTSQueueManager';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
 import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 
@@ -197,57 +199,32 @@ const TTS: React.FC = () => {
     setTimeout(() => setTtsStatus(null), 2000);
   };
 
+  // Handle clearing the TTS queue
+  const handleClearQueue = async () => {
+    setTtsStatus(null);
+    try {
+      await window.electron.ipcRenderer.invoke('tts:clearQueue');
+      setTtsStatus('TTS backlog cleared!');
+      setTimeout(() => setTtsStatus(null), 2000);
+    } catch (err) {
+      setTtsStatus('Failed to clear TTS backlog');
+      setTimeout(() => setTtsStatus(null), 2000);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
       {/* Help Modal */}
-      {showHelp && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 1000 }}>
-          <div style={{ maxWidth: 800, margin: '100px auto', background: '#111', padding: 24, borderRadius: 8, color: '#fff' }}>
-            <h2 style={{ fontWeight: 'bold', marginBottom: 16 }}>Amazon Polly TTS - Help</h2>
-            <div style={{ color: '#aaa', marginBottom: 16 }}>
-              This section provides information about using Amazon Polly for Text-to-Speech (TTS) in your application.
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: 8 }}>Enable TTS</h3>
-              <div style={{ color: '#aaa' }}>
-                Turn on TTS to enable voice reading of messages. You can configure the voice and other settings below.
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: 8 }}>Default Voice</h3>
-              <div style={{ color: '#aaa' }}>
-                Select the default voice for TTS. This will be used to read messages aloud.
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: 8 }}>Test Voice</h3>
-              <div style={{ color: '#aaa' }}>
-                Use the "Test Voice" button to play a test message using the selected voice. This helps you to quickly check the voice output.
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: 8 }}>Moderation and Filters</h3>
-              <div style={{ color: '#aaa' }}>
-                Coming soon: Advanced settings for moderation and filtering of messages.
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <button
-                onClick={() => setShowHelp(false)}
-                style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TTSHelpModal showHelp={showHelp} onClose={() => setShowHelp(false)} />
+      
       {/* Amazon Polly (Cloud TTS) - REQUIRED section */}
       <PollyConfigSection
         onHelp={() => setShowHelp(true)}
       />
-      {/* TTS Settings Section (refactored) */}
+      
+      {/* TTS Settings Section */}
       <TTSSettingsSection saving={saving} onSave={handleSaveTTS} status={ttsStatus} />
+      
       {/* Voice selection and test controls */}
       <TTSVoiceSelector
         voices={sortedVoices}
@@ -257,30 +234,15 @@ const TTS: React.FC = () => {
         disabled={saving}
         status={ttsStatus}
       />
+      
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
-      <div style={{ marginTop: 24 }}>
-        <button
-          style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={async () => {
-            setTtsStatus(null);
-            try {
-              await window.electron.ipcRenderer.invoke('tts:clearQueue');
-              setTtsStatus('TTS backlog cleared!');
-              setTimeout(() => setTtsStatus(null), 2000);
-            } catch (err) {
-              setTtsStatus('Failed to clear TTS backlog');
-              setTimeout(() => setTtsStatus(null), 2000);
-            }
-          }}
-        >
-          Clear TTS Backlog
-        </button>
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <span style={{ color: '#aaa', fontSize: 15 }}>
-          TTS Queue: <b>{ttsQueueLength}</b> message{ttsQueueLength === 1 ? '' : 's'} waiting
-        </span>
-      </div>
+      
+      {/* TTS Queue Management */}
+      <TTSQueueManager 
+        ttsQueueLength={ttsQueueLength} 
+        onClearQueue={handleClearQueue} 
+        status={ttsStatus}
+      />
     </div>
   );
 };
