@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import pollyVoiceEnginesSorted from '../assets/pollyVoiceEngines.sorted.json';
 import PollyConfigSection from './TTS/PollyConfigSection';
+import TTSSettingsSection from './TTS/TTSSettingsSection';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
+import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 
 // PollyConfig type (copy from backend)
 interface PollyConfig {
@@ -172,15 +174,15 @@ const TTS: React.FC = () => {
     };
   }, []);
 
-  // Save only TTS settings (global)
-  const handleSaveTTS = async () => {
+  // Save handler for TTS settings
+  const handleSaveTTS = async (settings: {
+    enabled: boolean;
+    readNameBeforeMessage: boolean;
+    includePlatformWithName: boolean;
+    maxRepeatedChars: number;
+  }) => {
     setSaving(true);
-    await window.electron.ipcRenderer.invoke('tts:setSettings', {
-      enabled: ttsEnabled,
-      readNameBeforeMessage,
-      includePlatformWithName,
-      maxRepeatedChars
-    });
+    await window.electron.ipcRenderer.invoke('tts:setSettings', settings);
     if (accessKeyId && secretAccessKey && region && selectedVoice) {
       await window.electron.ipcRenderer.invoke('polly:configure', {
         accessKeyId,
@@ -243,57 +245,10 @@ const TTS: React.FC = () => {
       <PollyConfigSection
         onHelp={() => setShowHelp(true)}
       />
-      <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>TTS Settings</h2>
-      <div style={{ color: '#aaa', marginBottom: 16 }}>
-        Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <label>
-          <input type="checkbox" checked={ttsEnabled} onChange={handleToggleTts} disabled={!ttsSettingsLoaded} /> Enable TTS
-        </label>
-        <span style={{ marginLeft: 12, color: ttsEnabled ? '#2ecc40' : '#ff4d4f' }}>
-          TTS is {ttsEnabled ? 'ON' : 'OFF'}
-        </span>
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <label>
-          <input type="checkbox" checked={readNameBeforeMessage} onChange={handleToggleReadName} disabled={!ttsSettingsLoaded} /> Read name before message
-        </label>
-        <div style={{ color: '#aaa', marginTop: 4 }}>
-          {readNameBeforeMessage
-            ? 'TTS will say "Alice says ..." or "Alice asks ..." before the message.'
-            : 'TTS will only read the message.'}
-        </div>
-        {readNameBeforeMessage && (
-          <div style={{ marginTop: 8, marginLeft: 24 }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={includePlatformWithName}
-                onChange={handleToggleIncludePlatform}
-                disabled={!ttsSettingsLoaded || !readNameBeforeMessage}
-              />{' '}
-              Include platform with name (e.g. "Alice from Twitch says ...")
-            </label>
-          </div>
-        )}
-      </div>
-      {/* Max repeated characters option */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated characters</div>
-        <input
-          type="number"
-          min={1}
-          max={10}
-          value={maxRepeatedChars}
-          onChange={e => setMaxRepeatedChars(Number(e.target.value))}
-          style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
-        />
-        <span style={{ color: '#aaa' }}>
-          Example: <b>loooooool</b> → <b>lool</b> (if limit is 2, <b>lool</b>)
-        </span>
-      </div>
-      <div style={{ marginBottom: 16 }}>
+      {/* TTS Settings Section (refactored) */}
+      <TTSSettingsSection saving={saving} onSave={handleSaveTTS} status={ttsStatus} />
+      {/* Voice selection and test controls */}
+      <div style={{ marginTop: 24 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>
         <select
           value={selectedVoice}
@@ -323,14 +278,6 @@ const TTS: React.FC = () => {
       <div style={{ marginTop: 24 }}>
         <button
           style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={handleSaveTTS}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save TTS Settings'}
-        </button>
-        {ttsStatus && <div style={{ color: ttsStatus === 'TTS settings saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{ttsStatus}</div>}
-        <button
-          style={{ background: '#ff4d4f', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4, marginLeft: 16 }}
           onClick={async () => {
             setTtsStatus(null);
             try {
