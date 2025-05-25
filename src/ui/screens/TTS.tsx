@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import pollyVoiceEnginesSorted from '../assets/pollyVoiceEngines.sorted.json';
 import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
 import TTSVoiceSelector from './TTS/TTSVoiceSelector';
@@ -38,12 +37,7 @@ function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6):
 }
 
 const TTS: React.FC = () => {
-  const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
-  const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
-  const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
   const [ttsQueueLength, setTtsQueueLength] = useState<number>(0);
-  const [maxRepeatedChars, setMaxRepeatedChars] = useState(3);
   const [saving, setSaving] = useState(false);
   const [ttsStatus, setTtsStatus] = useState<string | null>(null);
   const [voices, setVoices] = useState<PollyVoiceSorted[]>([]);
@@ -89,20 +83,6 @@ const TTS: React.FC = () => {
     return () => { isMounted = false; };
   }, []);
 
-  // Load TTS settings on mount
-  useEffect(() => {
-    let isMounted = true;
-    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean, includePlatformWithName: boolean, maxRepeatedChars?: number }) => {
-      if (!isMounted) return;
-      setTtsEnabled(!!settings.enabled);
-      setReadNameBeforeMessage(!!settings.readNameBeforeMessage);
-      setIncludePlatformWithName(!!settings.includePlatformWithName);
-      setMaxRepeatedChars(typeof settings.maxRepeatedChars === 'number' ? settings.maxRepeatedChars : 3);
-      setTtsSettingsLoaded(true);
-    });
-    return () => { isMounted = false; };
-  }, []);
-
   // Set selectedVoice only after both config and voices are loaded
   useEffect(() => {
     if (!voicesLoaded) return;
@@ -116,9 +96,6 @@ const TTS: React.FC = () => {
       return '';
     });
   }, [voicesLoaded, voices]);
-
-  // Use the new sorted JSON for the voice list
-  const sortedVoices: PollyVoiceSorted[] = pollyVoiceEnginesSorted as PollyVoiceSorted[];
 
   // Handler for test voice
   const handleTestVoice = async () => {
@@ -211,7 +188,7 @@ const TTS: React.FC = () => {
       
       {/* Voice selection and test controls */}
       <TTSVoiceSelector
-        voices={sortedVoices}
+        voices={voices}
         selectedVoice={selectedVoice}
         onVoiceChange={(voiceId: string) => setSelectedVoice(voiceId)}
         onTestVoice={handleTestVoice}
