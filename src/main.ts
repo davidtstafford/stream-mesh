@@ -36,6 +36,7 @@ interface TTSSettings {
   enabled: boolean;
   readNameBeforeMessage: boolean;
   includePlatformWithName: boolean;
+  maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -48,10 +49,11 @@ function loadTTSSettings(): TTSSettings {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : false,
       readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
+      maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
     };
   } catch {
-    // Default: TTS off, no name prefix, no platform
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false };
+    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3 };
   }
 }
 
@@ -109,6 +111,16 @@ function cleanUpTempTTSFiles() {
       }
     }
   }
+}
+
+// Utility to limit repeated characters in a string
+function filterRepeatedChars(text: string, maxRepeats: number): string {
+  if (!maxRepeats || maxRepeats < 1) return text;
+  // Replace runs of the same character longer than maxRepeats
+  return text.replace(/(.)\1{1,}/g, (match, char) => {
+    if (/\p{Emoji}/u.test(char)) return match; // skip emoji
+    return char.repeat(Math.min(match.length, maxRepeats));
+  });
 }
 
 app.whenReady().then(async () => {
@@ -393,6 +405,10 @@ app.whenReady().then(async () => {
           } else {
             ttsText = `${namePart} says ${ttsText}`;
           }
+        }
+        // Apply repeated char filter
+        if (typeof ttsSettings.maxRepeatedChars === 'number' && ttsSettings.maxRepeatedChars > 0) {
+          ttsText = filterRepeatedChars(ttsText, ttsSettings.maxRepeatedChars);
         }
         ttsQueue.enqueue({
           text: ttsText,

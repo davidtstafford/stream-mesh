@@ -48,6 +48,7 @@ const TTS: React.FC = () => {
     return !!(accessKeyId && secretAccessKey && region);
   });
   const [ttsQueueLength, setTtsQueueLength] = useState<number>(0);
+  const [maxRepeatedChars, setMaxRepeatedChars] = useState(3);
 
   // Load saved AWS config on mount
   useEffect(() => {
@@ -88,11 +89,12 @@ const TTS: React.FC = () => {
   // Load TTS settings on mount
   useEffect(() => {
     let isMounted = true;
-    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean, includePlatformWithName: boolean }) => {
+    window.electron.ipcRenderer.invoke('tts:getSettings').then((settings: { enabled: boolean, readNameBeforeMessage: boolean, includePlatformWithName: boolean, maxRepeatedChars?: number }) => {
       if (!isMounted) return;
       setTtsEnabled(!!settings.enabled);
       setReadNameBeforeMessage(!!settings.readNameBeforeMessage);
       setIncludePlatformWithName(!!settings.includePlatformWithName);
+      setMaxRepeatedChars(typeof settings.maxRepeatedChars === 'number' ? settings.maxRepeatedChars : 3);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -102,7 +104,9 @@ const TTS: React.FC = () => {
   useEffect(() => {
     if (!configLoaded || !voicesLoaded) return;
     setSelectedVoice(prev => {
-      if (prev && voices.some(v => v.Name === prev)) return prev;
+      if (prev && voices.some(v => v.Name === prev)) {
+        return prev;
+      }
       if (pollyConfig && pollyConfig.voiceId && voices.some(v => v.Name === pollyConfig.voiceId)) {
         setSelectedEngine(voices.find(v => v.Name === pollyConfig.voiceId)?.Engines[0] || '');
         return pollyConfig.voiceId;
@@ -172,7 +176,8 @@ const TTS: React.FC = () => {
     await window.electron.ipcRenderer.invoke('tts:setSettings', {
       enabled: ttsEnabled,
       readNameBeforeMessage,
-      includePlatformWithName
+      includePlatformWithName,
+      maxRepeatedChars
     });
     // Save selected voice/engine as well
     if (accessKeyId && secretAccessKey && region && selectedVoice && selectedEngine) {
@@ -413,6 +418,40 @@ const TTS: React.FC = () => {
             </label>
           </div>
         )}
+      </div>
+      {/* Max repeated characters option */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Limit Repeated Characters</div>
+        <label style={{ marginRight: 16 }}>
+          <input
+            type="radio"
+            name="maxRepeatedChars"
+            checked={maxRepeatedChars === 0}
+            onChange={() => setMaxRepeatedChars(0)}
+          />
+          No limit
+        </label>
+        <label style={{ marginRight: 16 }}>
+          <input
+            type="radio"
+            name="maxRepeatedChars"
+            checked={maxRepeatedChars === 2}
+            onChange={() => setMaxRepeatedChars(2)}
+          />
+          Limit to 2
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="maxRepeatedChars"
+            checked={maxRepeatedChars === 3}
+            onChange={() => setMaxRepeatedChars(3)}
+          />
+          Limit to 3
+        </label>
+        <div style={{ color: '#aaa', fontSize: 13, marginTop: 4 }}>
+          Example: <b>loooooool</b> → <b>lool</b> (if limit is 2, <b>lool</b>)
+        </div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Default Voice</div>
