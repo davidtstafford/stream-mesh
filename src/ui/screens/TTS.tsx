@@ -114,32 +114,6 @@ const TTS: React.FC = () => {
   // Use the new sorted JSON for the voice list
   const sortedVoices: PollyVoiceSorted[] = pollyVoiceEnginesSorted as PollyVoiceSorted[];
 
-  // Handler for toggling TTS enabled
-  const handleToggleTts = async () => {
-    const newEnabled = !ttsEnabled;
-    setTtsEnabled(newEnabled);
-  };
-
-  // Handler for toggling readNameBeforeMessage
-  const handleToggleReadName = async () => {
-    const newValue = !readNameBeforeMessage;
-    setReadNameBeforeMessage(newValue);
-    // If disabling, also disable includePlatformWithName
-    const newIncludePlatform = newValue ? includePlatformWithName : false;
-    setIncludePlatformWithName(newIncludePlatform);
-  };
-
-  // Handler for toggling includePlatformWithName
-  const handleToggleIncludePlatform = async () => {
-    const newValue = !includePlatformWithName;
-    setIncludePlatformWithName(newValue);
-  };
-
-  // Handler for changing voice
-  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedVoice(e.target.value);
-  };
-
   // Handler for test voice
   const handleTestVoice = async () => {
     setTtsStatus(null);
@@ -235,14 +209,13 @@ const TTS: React.FC = () => {
         status={ttsStatus}
       />
       
-      <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
-      
       {/* TTS Queue Management */}
       <TTSQueueManager 
         ttsQueueLength={ttsQueueLength} 
         onClearQueue={handleClearQueue} 
         status={ttsStatus}
       />
+      <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
     </div>
   );
 };
