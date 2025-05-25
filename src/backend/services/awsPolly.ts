@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 
+// Load Polly voices/engines asset for backend-side engine lookup
+import voicesJson from './pollyVoiceEngines.sorted.json';
+
 export interface PollyConfig {
   accessKeyId: string;
   secretAccessKey: string;
@@ -48,14 +51,21 @@ export function getPollyConfig(): PollyConfig | null {
   }
 }
 
+function getFirstEngineForVoice(voiceId?: string): string {
+  if (!voiceId) return 'standard';
+  const found = (voicesJson as any[]).find(v => v.Name === voiceId);
+  return found && found.Engines && found.Engines.length > 0 ? found.Engines[0] : 'standard';
+}
+
 export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string): Promise<string> {
   if (!polly || !pollyConfig) throw new Error('Polly is not configured');
+  const resolvedEngine = engine || getFirstEngineForVoice(voiceId || pollyConfig.voiceId);
   const params: AWS.Polly.SynthesizeSpeechInput = {
     OutputFormat: 'pcm', // Use PCM for WAV compatibility
     Text: text,
     VoiceId: voiceId || pollyConfig.voiceId || 'Joanna',
     TextType: 'text',
-    Engine: engine as any || 'standard',
+    Engine: resolvedEngine as any,
     SampleRate: '16000', // 16kHz mono
   };
   const result = await polly.synthesizeSpeech(params).promise();

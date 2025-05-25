@@ -43,7 +43,8 @@ class TTSQueue extends EventEmitter {
       try {
         const config = getPollyConfig();
         if (!config) throw new Error('Polly not configured');
-        const filePath = await synthesizeSpeech(item.text, item.voiceId || config.voiceId, item.engine || (config as any).engine);
+        // Only pass text and voiceId; engine is always resolved in synthesizeSpeech
+        const filePath = await synthesizeSpeech(item.text, item.voiceId || config.voiceId);
         // Play audio using a native player (Windows only, use PowerShell)
         await this.playAudio(filePath);
         fs.unlink(filePath, () => {}); // Clean up
