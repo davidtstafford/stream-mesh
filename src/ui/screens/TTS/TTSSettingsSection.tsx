@@ -8,6 +8,7 @@ interface TTSSettingsSectionProps {
     readNameBeforeMessage: boolean;
     includePlatformWithName: boolean;
     maxRepeatedChars: number;
+    skipLargeNumbers: boolean;
   }) => void;
   status: string | null;
 }
@@ -23,6 +24,8 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave,
     setIncludePlatformWithName,
     maxRepeatedChars,
     setMaxRepeatedChars,
+    skipLargeNumbers,
+    setSkipLargeNumbers,
   } = useTTSSettings();
 
   // Handlers
@@ -39,6 +42,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave,
       readNameBeforeMessage,
       includePlatformWithName,
       maxRepeatedChars,
+      skipLargeNumbers,
     });
   };
 
@@ -91,6 +95,20 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave,
         />
         <span style={{ color: '#aaa' }}>
           Example: <b>loooooool</b> → <b>lool</b> (if limit is 2, <b>lool</b>)
+        </span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={skipLargeNumbers}
+            onChange={e => setSkipLargeNumbers(e.target.checked)}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          Skip reading large numbers
+        </label>
+        <span style={{ color: '#aaa', marginLeft: 8 }}>
+          (Ignores numbers longer than 6 digits)
         </span>
       </div>
       <div style={{ marginTop: 24 }}>

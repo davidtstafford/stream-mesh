@@ -37,6 +37,7 @@ interface TTSSettings {
   readNameBeforeMessage: boolean;
   includePlatformWithName: boolean;
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
+  skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -50,10 +51,11 @@ function loadTTSSettings(): TTSSettings {
       readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
+      skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
     };
   } catch {
     // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3 };
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, skipLargeNumbers: false };
   }
 }
 
@@ -121,6 +123,12 @@ function filterRepeatedChars(text: string, maxRepeats: number): string {
     if (/\p{Emoji}/u.test(char)) return match; // skip emoji
     return char.repeat(Math.min(match.length, maxRepeats));
   });
+}
+
+// Utility to filter large numbers from TTS text
+function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6): string {
+  if (!skip) return text;
+  return text.replace(/\d{6,}/g, '[large number]');
 }
 
 app.whenReady().then(async () => {
@@ -409,6 +417,10 @@ app.whenReady().then(async () => {
         // Apply repeated char filter
         if (typeof ttsSettings.maxRepeatedChars === 'number' && ttsSettings.maxRepeatedChars > 0) {
           ttsText = filterRepeatedChars(ttsText, ttsSettings.maxRepeatedChars);
+        }
+        // Apply large number filter
+        if (typeof ttsSettings.skipLargeNumbers === 'boolean' && ttsSettings.skipLargeNumbers) {
+          ttsText = filterLargeNumbers(ttsText, true);
         }
         ttsQueue.enqueue({
           text: ttsText,

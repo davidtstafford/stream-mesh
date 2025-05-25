@@ -6,7 +6,6 @@ import TTSVoiceSelector from './TTS/TTSVoiceSelector';
 import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
-import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 
 // PollyConfig type (copy from backend)
 interface PollyConfig {
@@ -32,6 +31,12 @@ function toFileUrl(filePath: string) {
   return 'file://' + path;
 }
 
+// Utility to filter large numbers from TTS text
+function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6): string {
+  if (!skip) return text;
+  return text.replace(/\d{6,}/g, '[large number]');
+}
+
 const TTS: React.FC = () => {
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsSettingsLoaded, setTtsSettingsLoaded] = useState(false);
@@ -45,6 +50,7 @@ const TTS: React.FC = () => {
   const [selectedVoice, setSelectedVoice] = useState('');
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
 
   const {
     accessKeyId,
@@ -118,8 +124,10 @@ const TTS: React.FC = () => {
   const handleTestVoice = async () => {
     setTtsStatus(null);
     try {
+      // Filter large numbers if enabled
+      const filteredText = filterLargeNumbers('This is a test of Amazon Polly.', skipLargeNumbers);
       const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
-        text: 'This is a test of Amazon Polly.',
+        text: filteredText,
         voiceId: selectedVoice,
       });
       const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
@@ -157,8 +165,10 @@ const TTS: React.FC = () => {
     readNameBeforeMessage: boolean;
     includePlatformWithName: boolean;
     maxRepeatedChars: number;
+    skipLargeNumbers: boolean;
   }) => {
     setSaving(true);
+    setSkipLargeNumbers(settings.skipLargeNumbers);
     await window.electron.ipcRenderer.invoke('tts:setSettings', settings);
     if (accessKeyId && secretAccessKey && region && selectedVoice) {
       await window.electron.ipcRenderer.invoke('polly:configure', {
