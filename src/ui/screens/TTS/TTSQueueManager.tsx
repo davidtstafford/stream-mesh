@@ -3,13 +3,11 @@ import React from 'react';
 interface TTSQueueManagerProps {
   ttsQueueLength: number;
   onClearQueue: () => void;
-  status: string | null;
 }
 
 const TTSQueueManager: React.FC<TTSQueueManagerProps> = ({ 
   ttsQueueLength, 
-  onClearQueue,
-  status
+  onClearQueue
 }) => {
   return (
     <>

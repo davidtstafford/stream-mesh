@@ -14,7 +14,6 @@ interface VoiceSelectorProps {
   onVoiceChange: (voiceId: string) => void;
   onTestVoice: () => void;
   disabled?: boolean;
-  status?: string | null;
 }
 
 const TTSVoiceSelector: React.FC<VoiceSelectorProps> = ({
@@ -23,7 +22,6 @@ const TTSVoiceSelector: React.FC<VoiceSelectorProps> = ({
   onVoiceChange,
   onTestVoice,
   disabled,
-  status,
 }) => {
   return (
     <div style={{ marginTop: 24 }}>
@@ -51,7 +49,7 @@ const TTSVoiceSelector: React.FC<VoiceSelectorProps> = ({
       >
         Test Voice
       </button>
-      {status && <div style={{ color: status === 'Test voice played!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{status}</div>}
+      {/* Status message removed; now handled by parent only */}
     </div>
   );
 };

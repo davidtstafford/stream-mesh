@@ -171,9 +171,16 @@ const TTS: React.FC = () => {
         onHelp={() => setShowHelp(true)}
       />
       
+      {/* Status Message */}
+      {ttsStatus && (
+        <div style={{ margin: '16px 0', color: ttsStatus.includes('Failed') ? '#ff4d4f' : '#2ecc40', fontWeight: 500 }}>
+          {ttsStatus}
+        </div>
+      )}
+
       {/* TTS Settings Section */}
-      <TTSSettingsSection saving={saving} onSave={handleSaveTTS} status={ttsStatus} />
-      
+      <TTSSettingsSection saving={saving} onSave={handleSaveTTS} />
+
       {/* Voice selection and test controls */}
       <TTSVoiceSelector
         voices={voices}
@@ -181,14 +188,12 @@ const TTS: React.FC = () => {
         onVoiceChange={(voiceId: string) => setSelectedVoice(voiceId)}
         onTestVoice={handleTestVoice}
         disabled={saving}
-        status={ttsStatus}
       />
-      
+
       {/* TTS Queue Management */}
       <TTSQueueManager 
         ttsQueueLength={ttsQueueLength} 
-        onClearQueue={handleClearQueue} 
-        status={ttsStatus}
+        onClearQueue={handleClearQueue}
       />
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
 

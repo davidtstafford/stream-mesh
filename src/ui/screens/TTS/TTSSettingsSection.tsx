@@ -10,10 +10,9 @@ interface TTSSettingsSectionProps {
     maxRepeatedChars: number;
     skipLargeNumbers: boolean;
   }) => void;
-  status: string | null;
 }
 
-const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave, status }) => {
+const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave }) => {
   const {
     ttsEnabled,
     setTtsEnabled,
