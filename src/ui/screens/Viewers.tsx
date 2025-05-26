@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import voicesJson from '../assets/pollyVoiceEngines.sorted.json';
+import voicesJson from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
 // Use the preload-exposed ipcRenderer for secure IPC
 const ipcRenderer = window.electronAPI?.ipcRenderer;

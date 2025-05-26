@@ -1,26 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
-import TTSVoiceSelector from './TTS/TTSVoiceSelector';
+import TTSVoiceSelector, { PollyVoiceSorted } from './TTS/TTSVoiceSelector';
 import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
+import pollyVoiceEngines from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
 // PollyConfig type (copy from backend)
-interface PollyConfig {
+type PollyConfig = {
   accessKeyId: string;
   secretAccessKey: string;
   region: string;
   voiceId?: string;
   engine?: string;
-}
-
-// Remove all engineMap references and use the new array-based structure
-export interface PollyVoiceSorted {
-  Name: string;
-  LanguageName: string;
-  LanguageCode: string;
-  Engines: string[];
 }
 
 // Utility to convert Windows path to file URL
@@ -45,6 +38,8 @@ const TTS: React.FC = () => {
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
+  const [testAllOutput, setTestAllOutput] = useState('');
+  const [testAllLoading, setTestAllLoading] = useState(false);
 
   const {
     accessKeyId,
@@ -64,23 +59,12 @@ const TTS: React.FC = () => {
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch available voices from Polly after config is saved
+  // Use shared/assets/pollyVoiceEngines.sorted.json for voice list
   useEffect(() => {
-    let isMounted = true;
     setVoicesLoaded(false);
-    const fetchVoices = async () => {
-      try {
-        const result = await window.electron.ipcRenderer.invoke('polly:listVoices');
-        if (!isMounted) return;
-        setVoices(result.voices || []);
-        setVoicesLoaded(true);
-      } catch (err) {
-        setTtsStatus('Could not fetch Polly voices');
-        setVoicesLoaded(true);
-      }
-    };
-    fetchVoices();
-    return () => { isMounted = false; };
+    // pollyVoiceEngines is imported as JSON
+    setVoices(pollyVoiceEngines as PollyVoiceSorted[]);
+    setVoicesLoaded(true);
   }, []);
 
   // Set selectedVoice only after both config and voices are loaded
@@ -103,9 +87,13 @@ const TTS: React.FC = () => {
     try {
       // Filter large numbers if enabled
       const filteredText = filterLargeNumbers('This is a test of Amazon Polly.', skipLargeNumbers);
+      // Find the selected voice and its first engine
+      const selected = voices.find(v => v.Name === selectedVoice);
+      const engine = selected && selected.Engines && selected.Engines.length > 0 ? selected.Engines[0] : undefined;
       const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
         text: filteredText,
         voiceId: selectedVoice,
+        engine,
       });
       const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
       const audio = new Audio(dataUrl);
@@ -183,9 +171,16 @@ const TTS: React.FC = () => {
         onHelp={() => setShowHelp(true)}
       />
       
+      {/* Status Message */}
+      {ttsStatus && (
+        <div style={{ margin: '16px 0', color: ttsStatus.includes('Failed') ? '#ff4d4f' : '#2ecc40', fontWeight: 500 }}>
+          {ttsStatus}
+        </div>
+      )}
+
       {/* TTS Settings Section */}
-      <TTSSettingsSection saving={saving} onSave={handleSaveTTS} status={ttsStatus} />
-      
+      <TTSSettingsSection saving={saving} onSave={handleSaveTTS} />
+
       {/* Voice selection and test controls */}
       <TTSVoiceSelector
         voices={voices}
@@ -193,16 +188,70 @@ const TTS: React.FC = () => {
         onVoiceChange={(voiceId: string) => setSelectedVoice(voiceId)}
         onTestVoice={handleTestVoice}
         disabled={saving}
-        status={ttsStatus}
       />
-      
+
       {/* TTS Queue Management */}
       <TTSQueueManager 
         ttsQueueLength={ttsQueueLength} 
-        onClearQueue={handleClearQueue} 
-        status={ttsStatus}
+        onClearQueue={handleClearQueue}
       />
       <div style={{ color: '#aaa', marginTop: 16 }}>Coming soon: Moderation and more.</div>
+
+      {/* Test All Voices section (developer util) */}
+      <details style={{ marginTop: 32, background: '#23272b', borderRadius: 8, padding: 0 }}>
+        <summary style={{ padding: 16, fontWeight: 600, fontSize: 16, color: '#fff', cursor: 'pointer', outline: 'none' }}>
+          Test all voices – developer util only
+        </summary>
+        <div style={{ padding: 16 }}>
+          <button
+            style={{ padding: '8px 24px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none', cursor: 'pointer', marginBottom: 12 }}
+            onClick={async () => {
+              setTestAllLoading(true);
+              setTestAllOutput('');
+              try {
+                // Sort voices: English first, then by LanguageName, then by Name
+                const sortedVoices = [...voices].sort((a, b) => {
+                  const aEn = a.LanguageCode && a.LanguageCode.startsWith('en');
+                  const bEn = b.LanguageCode && b.LanguageCode.startsWith('en');
+                  if (aEn && !bEn) return -1;
+                  if (!aEn && bEn) return 1;
+                  const langCmp = (a.LanguageName || '').localeCompare(b.LanguageName || '');
+                  if (langCmp !== 0) return langCmp;
+                  return a.Name.localeCompare(b.Name);
+                });
+                const results: any[] = [];
+                for (const v of sortedVoices) {
+                  const engines = Array.isArray((v as any).SupportedEngines) ? (v as any).SupportedEngines.filter((e: string) => e === 'neural' || e === 'standard') : [];
+                  const workingEngines: string[] = [];
+                  for (const engine of engines) {
+                    try {
+                      await window.electron.ipcRenderer.invoke('polly:speak', { text: 'test', voiceId: v.Name, engine });
+                      workingEngines.push(engine);
+                    } catch {
+                      // Skip if synthesis fails
+                    }
+                  }
+                  if (workingEngines.length > 0) {
+                    results.push({ Name: v.Name, LanguageName: v.LanguageName, LanguageCode: v.LanguageCode, Engines: workingEngines });
+                  }
+                }
+                setTestAllOutput(results.map(v => JSON.stringify(v)).join('\n'));
+              } finally {
+                setTestAllLoading(false);
+              }
+            }}
+            disabled={testAllLoading || voices.length === 0}
+          >
+            {testAllLoading ? 'Testing All Voices...' : 'Test All Voices'}
+          </button>
+          <textarea
+            style={{ width: '100%', minHeight: 200, marginTop: 8, background: '#181c20', color: '#fff', border: '1px solid #444', borderRadius: 4, fontFamily: 'monospace', fontSize: 14 }}
+            value={testAllOutput}
+            readOnly
+            placeholder="Results will appear here as JSON..."
+          />
+        </div>
+      </details>
     </div>
   );
 };

@@ -5,7 +5,7 @@ import path from 'path';
 import { app } from 'electron';
 
 // Load Polly voices/engines asset for backend-side engine lookup
-import voicesJson from './pollyVoiceEngines.sorted.json';
+import voicesJson from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
 export interface PollyConfig {
   accessKeyId: string;
