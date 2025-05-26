@@ -9,6 +9,7 @@ const adminItems = [
   { label: 'Preferences', key: 'preferences' },
   { label: 'TTS', key: 'tts' },
   { label: 'Viewers', key: 'viewers' },
+  { label: 'OBS', key: 'obs' },
 ];
 const commandItems = [
   { label: 'System Commands', key: 'systemCommands' },

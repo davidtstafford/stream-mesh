@@ -9,10 +9,10 @@ Key principles:
 
 ## Checklist
 
-- [ ] **Create modular OBS screen under Admin**
-  - Frontend: `OBS.tsx` in `ui/screens/OBS/`
-  - Backend: `obsIntegration.ts` in `backend/services/`
-  - Add navigation entry for OBS in Admin
+- [x] **Create modular OBS screen under Admin**
+  - Frontend: `OBS.tsx` in `ui/screens/OBS/` **(done)**
+  - Backend: `obsIntegration.ts` in `backend/services/` **(done)**
+  - Add navigation entry for OBS in Admin **(done)**
 
 - [ ] **Refactor chat message formatting to backend**
   - Backend provides unified, style-rich chat message format for both Chat screen and OBS browser source
