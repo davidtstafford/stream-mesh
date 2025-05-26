@@ -18,7 +18,7 @@ Key principles:
   - Backend provides unified, style-rich chat message format for both Chat screen and OBS browser source **(done)**
   - Update Chat screen to consume backend-formatted messages **(done)**
 
-- [ ] **MVP: OBS Chat Browser Source**
+- [x] **MVP: OBS Chat Browser Source**
   - Create web server endpoint (e.g., `/obs/chat`) that serves a browser-friendly chat overlay
   - Overlay uses same style/font/layout as Chat screen
   - Add UI in OBS screen to display/copy the browser source URL

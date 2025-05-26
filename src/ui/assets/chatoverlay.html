@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamMesh OBS Chat Overlay</title>
+  <link rel="stylesheet" href="/ui/theme/theme.css" />
+  <style>
+    body {
+      margin: 0;
+      background: transparent;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+    #chat-messages {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 16px;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    .chat-message {
+      background: rgba(30, 34, 40, 0.85);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      padding: 8px 16px;
+      font-size: 1.1em;
+      line-height: 1.5;
+      box-shadow: 0 2px 8px #0006;
+      max-width: 60vw;
+      word-break: break-word;
+      pointer-events: auto;
+    }
+    .chat-username {
+      font-weight: bold;
+      margin-right: 8px;
+      color: #3a8dde;
+    }
+    .chat-text {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-messages"></div>
+  <script src="/ui/assets/chatoverlay.js"></script>
+</body>
+</html>

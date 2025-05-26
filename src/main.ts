@@ -11,6 +11,8 @@ import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
 import crypto from 'crypto';
+import express from 'express';
+import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -459,6 +461,13 @@ app.whenReady().then(async () => {
     }
   });
 
+  // --- Express server for OBS overlays ---
+  const overlayServer = express();
+  registerObsOverlayEndpoints(overlayServer);
+  overlayServer.listen(3001, () => {
+    console.log('Overlay server running on http://localhost:3001');
+  });
+
   // Only create the window after all handlers are registered
   createWindow();
 });
@@ -478,3 +487,10 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+// After app/server is created:
+if (process.env.NODE_ENV !== 'test') {
+  // ...existing code to create express app...
+  // Remove this line, as we now use overlayServer for OBS endpoints
+  // registerObsOverlayEndpoints(app); // <-- Remove this line
+}
