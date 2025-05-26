@@ -5,6 +5,7 @@ import TTSVoiceSelector, { PollyVoiceSorted } from './TTS/TTSVoiceSelector';
 import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
+import pollyVoiceEngines from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
 // PollyConfig type (copy from backend)
 type PollyConfig = {
@@ -58,23 +59,12 @@ const TTS: React.FC = () => {
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch available voices from Polly after config is saved
+  // Use shared/assets/pollyVoiceEngines.sorted.json for voice list
   useEffect(() => {
-    let isMounted = true;
     setVoicesLoaded(false);
-    const fetchVoices = async () => {
-      try {
-        const result = await window.electron.ipcRenderer.invoke('polly:listVoices');
-        if (!isMounted) return;
-        setVoices(result.voices || []);
-        setVoicesLoaded(true);
-      } catch (err) {
-        setTtsStatus('Could not fetch Polly voices');
-        setVoicesLoaded(true);
-      }
-    };
-    fetchVoices();
-    return () => { isMounted = false; };
+    // pollyVoiceEngines is imported as JSON
+    setVoices(pollyVoiceEngines as PollyVoiceSorted[]);
+    setVoicesLoaded(true);
   }, []);
 
   // Set selectedVoice only after both config and voices are loaded
@@ -97,9 +87,13 @@ const TTS: React.FC = () => {
     try {
       // Filter large numbers if enabled
       const filteredText = filterLargeNumbers('This is a test of Amazon Polly.', skipLargeNumbers);
+      // Find the selected voice and its first engine
+      const selected = voices.find(v => v.Name === selectedVoice);
+      const engine = selected && selected.Engines && selected.Engines.length > 0 ? selected.Engines[0] : undefined;
       const filePath = await window.electron.ipcRenderer.invoke('polly:speak', {
         text: filteredText,
         voiceId: selectedVoice,
+        engine,
       });
       const dataUrl = await window.electron.ipcRenderer.invoke('polly:getAudioDataUrl', filePath);
       const audio = new Audio(dataUrl);
