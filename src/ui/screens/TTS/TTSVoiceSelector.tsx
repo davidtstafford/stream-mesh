@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Use the same interface as in TTS.tsx
-interface PollyVoiceSorted {
+export interface PollyVoiceSorted {
   Name: string;
   LanguageName: string;
   LanguageCode: string;
