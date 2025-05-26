@@ -4,7 +4,7 @@ const path = require('path');
 
 const srcDir = path.join(__dirname, '../src/ui/assets');
 const destDir = path.join(__dirname, '../dist/backend/ui/assets');
-const filesToCopy = ['chatoverlay.html', 'chatoverlay.js'];
+const filesToCopy = ['chatoverlay.html', 'chatoverlay.js', 'ttsoverlay.html', 'ttsoverlay.js'];
 
 if (!fs.existsSync(destDir)) {
   fs.mkdirSync(destDir, { recursive: true });

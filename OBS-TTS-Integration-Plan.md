@@ -8,33 +8,34 @@ Expose a browser source URL for TTS (Text-to-Speech) audio alerts, so users can 
 ## Steps
 
 ### 1. Backend: Serve TTS Overlay HTML/JS
-- [ ] Create `src/ui/assets/ttsoverlay.html` and `ttsoverlay.js` for the TTS overlay.
-- [ ] In `obsIntegration.ts`, add endpoints:
+- [x] Create `src/ui/assets/ttsoverlay.html` and `ttsoverlay.js` for the TTS overlay.
+- [x] In `obsIntegration.ts`, add endpoints:
     - `/obs/tts` → serves `ttsoverlay.html`
     - `/ui/assets/ttsoverlay.js` → serves `ttsoverlay.js`
-- [ ] Add `/obs/tts/stream` SSE or WebSocket endpoint to push TTS events (with audio URLs or base64 data) to overlay clients.
-- [ ] Track active TTS overlay connections (increment on connect, decrement on disconnect).
-- [ ] Add `/obs/tts/connections` endpoint to return the number of active TTS overlay connections.
+- [x] Add `/obs/tts/stream` SSE endpoint to push TTS events (with audio URLs) to overlay clients.
+- [x] Track active TTS overlay connections (increment on connect, decrement on disconnect).
+- [x] Add `/obs/tts/connections` endpoint to return the number of active TTS overlay connections.
 
 ### 2. Backend: TTS Event Push Logic
-- [ ] When a TTS event is triggered (e.g., chat triggers TTS), push the event (with audio URL or data) to all connected TTS overlay clients.
-- [ ] Ensure audio files are accessible to the overlay (e.g., serve from a static directory or provide a direct URL).
+- [x] When a TTS event is triggered (e.g., chat triggers TTS), push the event (with audio URL) to all connected TTS overlay clients.
+- [x] Ensure audio files are accessible to the overlay (e.g., serve from a static directory or provide a direct URL).
+- [ ] **NEW:** Add `/tts-audio/:file` endpoint to serve generated TTS audio files from the Electron user data directory, with security checks.
 
 ### 3. Build: Asset Copy
-- [ ] Update `copy-obs-assets.js` to also copy `ttsoverlay.html` and `ttsoverlay.js` to the backend assets directory after build.
+- [x] Update `copy-obs-assets.js` to also copy `ttsoverlay.html` and `ttsoverlay.js` to the backend assets directory after build.
 
 ### 4. Frontend: OBS Admin Screen
-- [ ] In `OBS.tsx`, add a section for the TTS overlay:
+- [x] In `OBS.tsx`, add a section for the TTS overlay:
     - Display the TTS overlay URL (e.g., `http://localhost:3001/obs/tts`)
     - Add a copy button
     - Show a live connection count ("N applications are currently accessing the overlay.")
     - Add a short explanation for how to use it in OBS
 
 ### 5. Frontend: TTS Overlay Implementation
-- [ ] `ttsoverlay.html`/`.js` should:
-    - Connect to `/obs/tts/stream` (SSE or WebSocket)
-    - Play incoming TTS audio events automatically
-    - (Optional) Show a simple visual indicator when audio is playing
+- [x] `ttsoverlay.html`/`.js`:
+    - Connects to `/obs/tts/stream` (SSE)
+    - Plays incoming TTS audio events automatically
+    - (Optional) Shows a simple visual indicator when audio is playing
 
 ### 6. Testing & Validation
 - [ ] Test with multiple OBS/browser clients

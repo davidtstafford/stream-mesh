@@ -2,6 +2,8 @@
 // Handles sequential TTS playback and queue management
 import { EventEmitter } from 'events';
 import { synthesizeSpeech, getPollyConfig } from './awsPolly';
+import path from 'path';
+import { broadcastTTSOverlayEvent } from './obsIntegration';
 import fs from 'fs';
 
 interface TTSQueueItem {
@@ -45,6 +47,13 @@ class TTSQueue extends EventEmitter {
         if (!config) throw new Error('Polly not configured');
         // Only pass text and voiceId; engine is always resolved in synthesizeSpeech
         const filePath = await synthesizeSpeech(item.text, item.voiceId || config.voiceId);
+
+        // Broadcast to OBS TTS overlays (use a file URL that browser can access)
+        // Serve from /tts-audio/ if needed, else use file://
+        const fileName = path.basename(filePath);
+        const audioUrl = `/tts-audio/${fileName}`;
+        broadcastTTSOverlayEvent({ url: audioUrl });
+
         // Play audio using a native player (Windows only, use PowerShell)
         await this.playAudio(filePath);
         fs.unlink(filePath, () => {}); // Clean up
