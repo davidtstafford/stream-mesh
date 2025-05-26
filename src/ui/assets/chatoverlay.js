@@ -4,10 +4,10 @@
 
 const chatMessages = document.getElementById('chat-messages');
 
-function addChatMessage({ username, text, color }) {
+function addChatMessage({ user, message, color }) {
   const msg = document.createElement('div');
   msg.className = 'chat-message';
-  msg.innerHTML = `<span class="chat-username" style="color:${color || '#3a8dde'}">${username}</span><span class="chat-text">${text}</span>`;
+  msg.innerHTML = `<span class="chat-username" style="color:${color || '#3a8dde'}">${user}</span><span class="chat-text">${message}</span>`;
   chatMessages.appendChild(msg);
   // Scroll to bottom
   chatMessages.scrollTop = chatMessages.scrollHeight;
