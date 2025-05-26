@@ -60,11 +60,23 @@ class TTSQueue extends EventEmitter {
   }
 
   private playAudio(filePath: string): Promise<void> {
-    // Use PowerShell to play WAV audio synchronously (blocks until done)
+    // Cross-platform audio playback
     return new Promise((resolve, reject) => {
       const { exec } = require('child_process');
-      // Use Windows Media SoundPlayer for WAV
-      const command = `powershell -c (New-Object Media.SoundPlayer '${filePath}').PlaySync();`;
+      const os = require('os');
+      let command: string;
+      const platform = os.platform();
+      if (platform === 'win32') {
+        // Windows: Use PowerShell
+        command = `powershell -c (New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync();`;
+      } else if (platform === 'darwin') {
+        // macOS: Use afplay
+        command = `afplay '${filePath.replace(/'/g, "'\\''")}'`;
+      } else {
+        // Linux: Try aplay, paplay, or play (from sox)
+        // Try aplay first, fallback to paplay/play if needed
+        command = `aplay '${filePath.replace(/'/g, "'\\''")}' || paplay '${filePath.replace(/'/g, "'\\''")}' || play '${filePath.replace(/'/g, "'\\''")}'`;
+      }
       exec(command, (error: any) => {
         if (error) reject(error);
         else resolve();
