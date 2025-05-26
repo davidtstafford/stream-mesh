@@ -160,10 +160,23 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('chat:fetch', async (_event, filters) => {
+    const { format } = filters || {};
     return new Promise((resolve, reject) => {
       fetchChatMessages(filters || {}, (err, rows) => {
         if (err) reject(err.message);
-        else resolve(rows);
+        else if (format === 'formatted') {
+          // Use backend formatting for each message
+          const { formatChatMessage } = require('./backend/services/chatFormatting');
+          resolve((rows || []).map((row: any) => formatChatMessage({
+            platform: row.platform,
+            channel: row.channel || '',
+            user: row.user,
+            message: row.text, // DB uses 'text', live uses 'message'
+            time: row.time,
+          })));
+        } else {
+          resolve(rows);
+        }
       });
     });
   });
@@ -429,10 +442,12 @@ app.whenReady().then(async () => {
         });
       });
     }
-    // Send live chat message to renderer for real-time update
+    // Send live chat message to renderer for real-time update (format for UI/OBS)
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
-      win.webContents.send('chat:live', event);
+      // Use backend formatting for live messages
+      const { formatChatMessage } = require('./backend/services/chatFormatting');
+      win.webContents.send('chat:live', formatChatMessage(event));
     }
   });
 

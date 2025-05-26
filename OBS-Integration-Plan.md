@@ -14,9 +14,9 @@ Key principles:
   - Backend: `obsIntegration.ts` in `backend/services/` **(done)**
   - Add navigation entry for OBS in Admin **(done)**
 
-- [ ] **Refactor chat message formatting to backend**
-  - Backend provides unified, style-rich chat message format for both Chat screen and OBS browser source
-  - Update Chat screen to consume backend-formatted messages
+- [x] **Refactor chat message formatting to backend**
+  - Backend provides unified, style-rich chat message format for both Chat screen and OBS browser source **(done)**
+  - Update Chat screen to consume backend-formatted messages **(done)**
 
 - [ ] **MVP: OBS Chat Browser Source**
   - Create web server endpoint (e.g., `/obs/chat`) that serves a browser-friendly chat overlay
