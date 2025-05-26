@@ -1,3 +1,4 @@
+// (removed misplaced endpoint definition)
 // OBS Integration Service (MVP)
 // This module will handle backend logic for OBS overlays (chat, TTS, alerts, etc.)
 // Future: Add endpoints and event push logic for overlays
@@ -12,6 +13,9 @@ export function getObsOverlayUrl(type: 'chat' | 'tts' | 'alerts' = 'chat'): stri
 }
 
 // --- OBS Chat Overlay Endpoint ---
+// Track active SSE connections
+let activeChatOverlayConnections = 0;
+
 export function registerObsOverlayEndpoints(app: express.Express) {
   // Serve the overlay HTML
   app.get('/obs/chat', (_req, res) => {
@@ -22,8 +26,15 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     res.sendFile(path.join(__dirname, '../ui/assets/chatoverlay.js'));
   });
   // Serve the theme CSS (already handled if static, else add here)
+
+  // Endpoint to get the number of active chat overlay connections
+  app.get('/obs/chat/connections', (_req: express.Request, res: express.Response) => {
+    res.json({ connections: activeChatOverlayConnections });
+  });
+
   // SSE endpoint for chat messages
   app.get('/obs/chat/stream', (req, res) => {
+    activeChatOverlayConnections++;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -39,6 +50,12 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     req.on('close', () => {
       clearInterval(keepAlive);
       chatBus.off('chat', onChat);
+      activeChatOverlayConnections = Math.max(0, activeChatOverlayConnections - 1);
     });
+  });
+
+  // Endpoint to get the number of active chat overlay connections
+  app.get('/obs/chat/connections', (_req, res) => {
+    res.json({ connections: activeChatOverlayConnections });
   });
 }

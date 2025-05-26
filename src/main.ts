@@ -463,6 +463,17 @@ app.whenReady().then(async () => {
 
   // --- Express server for OBS overlays ---
   const overlayServer = express();
+  // Enable CORS for all overlay endpoints
+  overlayServer.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+    } else {
+      next();
+    }
+  });
   registerObsOverlayEndpoints(overlayServer);
   overlayServer.listen(3001, () => {
     console.log('Overlay server running on http://localhost:3001');
