@@ -40,6 +40,7 @@ interface TTSSettings {
   includePlatformWithName: boolean;
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
+  muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -54,6 +55,7 @@ function loadTTSSettings(): TTSSettings {
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
+      muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
     };
   } catch {
     // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
@@ -437,10 +439,14 @@ app.whenReady().then(async () => {
         if (typeof ttsSettings.skipLargeNumbers === 'boolean' && ttsSettings.skipLargeNumbers) {
           ttsText = filterLargeNumbers(ttsText, true);
         }
+        // --- Mute native playback if overlays are connected and muteWhenActiveSource is true ---
+        const { getActiveTTSOverlayConnections } = require('./backend/services/obsIntegration');
+        const muteNative = !!ttsSettings.muteWhenActiveSource && getActiveTTSOverlayConnections() > 0;
         ttsQueue.enqueue({
           text: ttsText,
           user: event.user,
-          voiceId // If set, will override default
+          voiceId, // If set, will override default
+          muteNative,
         });
       });
     }

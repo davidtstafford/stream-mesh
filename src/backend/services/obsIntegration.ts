@@ -3,8 +3,12 @@ import path from 'path';
 import express from 'express';
 
 // --- OBS TTS Overlay Endpoint ---
-let activeTTSOverlayConnections = 0;
+export let activeTTSOverlayConnections = 0;
 const ttsOverlayClients: express.Response[] = [];
+// Utility for main process to get active TTS overlay connections
+export function getActiveTTSOverlayConnections(): number {
+  return activeTTSOverlayConnections;
+}
 
 // Broadcast a TTS event (e.g., { url }) to all connected overlay clients
 export function broadcastTTSOverlayEvent(event: { url: string }) {
@@ -36,7 +40,7 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     const fs = require('fs');
     app.get('/tts-audio/:file', (req: express.Request, res: express.Response) => {
       const file = req.params.file;
-      if (!/^streammesh_tts_\d+\.wav$/.test(file)) {
+      if (!/^streammesh_tts_\d+\.(mp3|wav)$/.test(file)) {
         return res.status(400).send('Invalid file name');
       }
       const userDataDir = electronApp.getPath('userData');

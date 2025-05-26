@@ -9,6 +9,7 @@ interface TTSSettingsSectionProps {
     includePlatformWithName: boolean;
     maxRepeatedChars: number;
     skipLargeNumbers: boolean;
+    muteWhenActiveSource: boolean;
   }) => void;
 }
 
@@ -25,6 +26,8 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     setMaxRepeatedChars,
     skipLargeNumbers,
     setSkipLargeNumbers,
+    muteWhenActiveSource,
+    setMuteWhenActiveSource,
   } = useTTSSettings();
 
   // Handlers
@@ -42,6 +45,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
       includePlatformWithName,
       maxRepeatedChars,
       skipLargeNumbers,
+      muteWhenActiveSource,
     });
   };
 
@@ -58,6 +62,21 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
         <span style={{ marginLeft: 12, color: ttsEnabled ? '#2ecc40' : '#ff4d4f' }}>
           TTS is {ttsEnabled ? 'ON' : 'OFF'}
         </span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={muteWhenActiveSource}
+            onChange={e => setMuteWhenActiveSource(e.target.checked)}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          Mute TTS when in use by active source
+        </label>
+        <div style={{ color: '#aaa', marginTop: 6, maxWidth: 520 }}>
+          <b>Note:</b> When this is <b>OFF</b>, you may hear an echo if both this app and another app (like OBS) are playing TTS audio at the same time.<br />
+          When <b>ON</b>, TTS audio will be muted in this app while an active overlay/browser source is connected (such as in OBS), helping to prevent echo or double playback.
+        </div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label>

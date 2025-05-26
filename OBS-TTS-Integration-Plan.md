@@ -36,6 +36,12 @@ Expose a browser source URL for TTS (Text-to-Speech) audio alerts, so users can 
     - Connects to `/obs/tts/stream` (SSE)
     - Plays incoming TTS audio events automatically
     - (Optional) Shows a simple visual indicator when audio is playing
+### 5a. Frontend: TTS Mute Option
+- [ ] Add a button under the Enable TTS option in the TTS screen:
+    - Label: "Mute TTS when in use by active source"
+    - When ON, TTS audio is muted in the app if an overlay/browser source is connected (prevents echo/double playback)
+    - When OFF, both the app and overlays may play TTS audio, which can cause echo
+    - Add a detailed note explaining the echo/double playback risk
 
 ### 6. Testing & Validation
 - [ ] Test with multiple OBS/browser clients
