@@ -7,6 +7,7 @@ export interface TTSSettings {
   maxRepeatedChars?: number;
   skipLargeNumbers?: boolean;
   muteWhenActiveSource?: boolean;
+  disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
 }
 
 export function useTTSSettings() {
@@ -17,6 +18,7 @@ export function useTTSSettings() {
   const [maxRepeatedChars, setMaxRepeatedChars] = useState(3);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
   const [muteWhenActiveSource, setMuteWhenActiveSource] = useState(false);
+  const [disableNeuralVoices, setDisableNeuralVoices] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -28,6 +30,7 @@ export function useTTSSettings() {
       setMaxRepeatedChars(typeof settings.maxRepeatedChars === 'number' ? settings.maxRepeatedChars : 3);
       setSkipLargeNumbers(!!settings.skipLargeNumbers);
       setMuteWhenActiveSource(!!settings.muteWhenActiveSource);
+      setDisableNeuralVoices(!!settings.disableNeuralVoices);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -47,5 +50,7 @@ export function useTTSSettings() {
     setSkipLargeNumbers,
     muteWhenActiveSource,
     setMuteWhenActiveSource,
+    disableNeuralVoices,
+    setDisableNeuralVoices,
   };
 }

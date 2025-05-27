@@ -57,13 +57,44 @@ function getFirstEngineForVoice(voiceId?: string): string {
   return found && found.Engines && found.Engines.length > 0 ? found.Engines[0] : 'standard';
 }
 
+
 export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string): Promise<string> {
   if (!polly || !pollyConfig) throw new Error('Polly is not configured');
-  const resolvedEngine = engine || getFirstEngineForVoice(voiceId || pollyConfig.voiceId);
+
+  // Load TTS settings to check for neural voice restriction
+  let disableNeuralVoices = false;
+  try {
+    const userDataPath = app.getPath('userData');
+    const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+    if (fs.existsSync(ttsSettingsPath)) {
+      const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+      disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+    }
+  } catch {}
+
+  // Find the requested voice in the voices list
+  const allVoices = voicesJson as any[];
+  let requestedVoiceId = voiceId || (pollyConfig ? pollyConfig.voiceId : undefined) || 'Brian';
+  let requestedVoice = allVoices.find(v => v.Name === requestedVoiceId);
+  let resolvedVoiceId = requestedVoiceId;
+  let resolvedEngine = engine || (requestedVoice && requestedVoice.Engines && requestedVoice.Engines[0]) || 'standard';
+
+  // If neural voices are disabled, force standard engine and fallback to Standard Brian if needed
+  if (disableNeuralVoices) {
+    // If requested voice does not support standard, fallback to Brian (standard)
+    if (!requestedVoice || !requestedVoice.Engines.includes('standard')) {
+      requestedVoice = allVoices.find(v => v.Name === 'Brian' && v.Engines.includes('standard'));
+      resolvedVoiceId = 'Brian';
+      resolvedEngine = 'standard';
+    } else {
+      resolvedEngine = 'standard';
+    }
+  }
+
   const params: AWS.Polly.SynthesizeSpeechInput = {
     OutputFormat: 'mp3', // Use MP3 for browser/OBS compatibility
     Text: text,
-    VoiceId: voiceId || pollyConfig.voiceId || 'Joanna',
+    VoiceId: resolvedVoiceId,
     TextType: 'text',
     Engine: resolvedEngine as any,
     // SampleRate is ignored for MP3

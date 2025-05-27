@@ -41,6 +41,7 @@ interface TTSSettings {
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
+  disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -56,10 +57,11 @@ function loadTTSSettings(): TTSSettings {
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
+      disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
     };
   } catch {
     // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, skipLargeNumbers: false };
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, skipLargeNumbers: false, disableNeuralVoices: false };
   }
 }
 

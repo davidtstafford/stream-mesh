@@ -20,6 +20,7 @@ If you want to update StreamMesh to the latest version after changes have been m
 
 StreamMesh is a Windows desktop application for streamers, built with Electron, React, and Node.js (TypeScript). It features a modern UI, local SQLite storage, and AWS Polly integration for TTS. All user data is stored locally. The app supports light, dark, and system themes (dark by default). Manual updates only. Packaged as an MSI/EXE installer for Windows 10+.
 
+
 ## Features
 - Navigation bar with collapsible sections
 - Link to Streams (Twitch, TikTok placeholder)
@@ -28,6 +29,18 @@ StreamMesh is a Windows desktop application for streamers, built with Electron, 
 - Commands: System and Custom (coming soon)
 - Local SQLite database
 - AWS Polly TTS integration
+
+### New: Disable Neural Voices (Cost-Saving Option)
+
+- **Location:** TTS admin screen (Settings)
+- **Description:** Adds a checkbox to disable neural voices, with a brief explanation about AWS Polly costs.
+- **Effect when enabled:**
+  - Neural voices are hidden from all voice selection lists (TTS and Viewers screens).
+  - The backend will never use neural voices. If a neural voice is requested (including for users who previously selected one), the system will automatically fall back to Standard Brian.
+- **Purpose:** Helps users avoid higher AWS Polly costs by restricting all TTS to standard voices only.
+
+**How to use:**  
+Go to the TTS settings, check "Disable neural voices," and save. All voice selection and playback will now use only standard voices.
 
 ## Getting Started
 
