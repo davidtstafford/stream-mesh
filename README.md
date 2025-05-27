@@ -1,3 +1,21 @@
+## Updating StreamMesh to the Latest Version
+
+If you want to update StreamMesh to the latest version after changes have been made:
+
+1. Open Terminal (macOS) or Command Prompt (Windows).
+2. Navigate to your `stream-mesh` folder:
+   ```sh
+   cd stream-mesh
+   ```
+3. Pull the latest code and update dependencies:
+   ```sh
+   git pull
+   npm install
+   npm run build && npm start
+   ```
+4. The app will relaunch with the latest updates.
+
+**Note:** All commands should work without `sudo` if you installed Node.js and Homebrew as a normal user. If you see a permissions error, you may need to fix your Homebrew or Node.js setup, but this is rare.
 # Stream Mesh
 
 StreamMesh is a Windows desktop application for streamers, built with Electron, React, and Node.js (TypeScript). It features a modern UI, local SQLite storage, and AWS Polly integration for TTS. All user data is stored locally. The app supports light, dark, and system themes (dark by default). Manual updates only. Packaged as an MSI/EXE installer for Windows 10+.
