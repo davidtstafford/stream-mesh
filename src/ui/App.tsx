@@ -9,17 +9,19 @@ import TTS from './screens/TTS';
 import Viewers from './screens/Viewers';
 import SystemCommands from './screens/SystemCommands';
 import CustomCommands from './screens/CustomCommands';
+import OBS from './screens/OBS/OBS';
 import './theme/theme.css';
 
 const screenMap: Record<string, React.ReactNode> = {
-  link: <LinkToStreams />,
-  chat: <Chat />,
-  chatHistory: <ChatHistory />,
-  preferences: <Preferences />,
-  tts: <TTS />,
-  viewers: <Viewers />,
-  systemCommands: <SystemCommands />,
-  customCommands: <CustomCommands />,
+  link: <LinkToStreams />, 
+  chat: <Chat />, 
+  chatHistory: <ChatHistory />, 
+  preferences: <Preferences />, 
+  tts: <TTS />, 
+  viewers: <Viewers />, 
+  systemCommands: <SystemCommands />, 
+  customCommands: <CustomCommands />, 
+  obs: <OBS />,
 };
 
 const App: React.FC = () => {

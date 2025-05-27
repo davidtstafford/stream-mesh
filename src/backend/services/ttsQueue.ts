@@ -2,6 +2,8 @@
 // Handles sequential TTS playback and queue management
 import { EventEmitter } from 'events';
 import { synthesizeSpeech, getPollyConfig } from './awsPolly';
+import path from 'path';
+import { broadcastTTSOverlayEvent } from './obsIntegration';
 import fs from 'fs';
 
 interface TTSQueueItem {
@@ -9,6 +11,7 @@ interface TTSQueueItem {
   voiceId?: string;
   engine?: string;
   user?: string;
+  muteNative?: boolean;
 }
 
 class TTSQueue extends EventEmitter {
@@ -17,6 +20,7 @@ class TTSQueue extends EventEmitter {
   private stopRequested = false;
 
   enqueue(item: TTSQueueItem) {
+    console.log('[TTSQueue] Enqueue:', JSON.stringify(item));
     // Add to the end of the queue (FIFO)
     this.queue.push(item);
     this.emit('queueChanged', this.queue.length);
@@ -43,12 +47,30 @@ class TTSQueue extends EventEmitter {
       try {
         const config = getPollyConfig();
         if (!config) throw new Error('Polly not configured');
+        console.log('[TTSQueue] Synthesizing:', item.text, 'Voice:', item.voiceId || config.voiceId);
         // Only pass text and voiceId; engine is always resolved in synthesizeSpeech
         const filePath = await synthesizeSpeech(item.text, item.voiceId || config.voiceId);
+
+        // Broadcast to OBS TTS overlays (use a file URL that browser can access)
+        // Serve from /tts-audio/ if needed, else use file://
+        const fileName = path.basename(filePath);
+        const audioUrl = `/tts-audio/${fileName}`;
+        console.log('[TTSQueue] Broadcasting overlay event:', audioUrl);
+        broadcastTTSOverlayEvent({ url: audioUrl });
+
         // Play audio using a native player (Windows only, use PowerShell)
-        await this.playAudio(filePath);
-        fs.unlink(filePath, () => {}); // Clean up
+        if (!item.muteNative) {
+          console.log('[TTSQueue] Native playback:', filePath);
+          await this.playAudio(filePath);
+        } else {
+          console.log('[TTSQueue] Native playback muted');
+        }
+        // Delay deletion to allow overlays to load/play the file
+        setTimeout(() => {
+          fs.unlink(filePath, () => {});
+        }, 5000); // 5 seconds
       } catch (err) {
+        console.error('[TTSQueue] Error:', err);
         this.emit('error', err);
       }
       // Optionally, emit again after playback if you want to distinguish between 'waiting' and 'spoken'
@@ -58,6 +80,7 @@ class TTSQueue extends EventEmitter {
     this.stopRequested = false;
     this.emit('queueChanged', this.queue.length);
   }
+// Utility for main process to get active TTS overlay connections
 
   private playAudio(filePath: string): Promise<void> {
     // Cross-platform audio playback

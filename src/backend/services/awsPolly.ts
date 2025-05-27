@@ -61,42 +61,21 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
   if (!polly || !pollyConfig) throw new Error('Polly is not configured');
   const resolvedEngine = engine || getFirstEngineForVoice(voiceId || pollyConfig.voiceId);
   const params: AWS.Polly.SynthesizeSpeechInput = {
-    OutputFormat: 'pcm', // Use PCM for WAV compatibility
+    OutputFormat: 'mp3', // Use MP3 for browser/OBS compatibility
     Text: text,
     VoiceId: voiceId || pollyConfig.voiceId || 'Joanna',
     TextType: 'text',
     Engine: resolvedEngine as any,
-    SampleRate: '16000', // 16kHz mono
+    // SampleRate is ignored for MP3
   };
   const result = await polly.synthesizeSpeech(params).promise();
   if (!result.AudioStream) throw new Error('No audio stream returned');
-  // Convert PCM to WAV header
   const userDataDir = app.getPath('userData');
-  const filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.wav`);
-  const wavBuffer = pcmToWav(result.AudioStream as Buffer, 16000, 1);
-  fs.writeFileSync(filePath, wavBuffer);
+  const filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.mp3`);
+  fs.writeFileSync(filePath, Buffer.from(result.AudioStream as Buffer));
   return filePath;
 }
 
-// Helper: Convert PCM buffer to WAV
-function pcmToWav(pcmBuffer: Buffer, sampleRate: number, channels: number): Buffer {
-  const header = Buffer.alloc(44);
-  const dataSize = pcmBuffer.length;
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + dataSize, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16); // Subchunk1Size
-  header.writeUInt16LE(1, 20); // AudioFormat PCM
-  header.writeUInt16LE(channels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * channels * 2, 28); // ByteRate
-  header.writeUInt16LE(channels * 2, 32); // BlockAlign
-  header.writeUInt16LE(16, 34); // BitsPerSample
-  header.write('data', 36);
-  header.writeUInt32LE(dataSize, 40);
-  return Buffer.concat([header, pcmBuffer]);
-}
 
 export async function listPollyVoices(): Promise<any[]> {
   if (!polly) throw new Error('Polly is not configured');

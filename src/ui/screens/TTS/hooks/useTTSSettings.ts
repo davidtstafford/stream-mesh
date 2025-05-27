@@ -6,6 +6,7 @@ export interface TTSSettings {
   includePlatformWithName: boolean;
   maxRepeatedChars?: number;
   skipLargeNumbers?: boolean;
+  muteWhenActiveSource?: boolean;
 }
 
 export function useTTSSettings() {
@@ -15,6 +16,7 @@ export function useTTSSettings() {
   const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
   const [maxRepeatedChars, setMaxRepeatedChars] = useState(3);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
+  const [muteWhenActiveSource, setMuteWhenActiveSource] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,6 +27,7 @@ export function useTTSSettings() {
       setIncludePlatformWithName(!!settings.includePlatformWithName);
       setMaxRepeatedChars(typeof settings.maxRepeatedChars === 'number' ? settings.maxRepeatedChars : 3);
       setSkipLargeNumbers(!!settings.skipLargeNumbers);
+      setMuteWhenActiveSource(!!settings.muteWhenActiveSource);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -42,5 +45,7 @@ export function useTTSSettings() {
     setMaxRepeatedChars,
     skipLargeNumbers,
     setSkipLargeNumbers,
+    muteWhenActiveSource,
+    setMuteWhenActiveSource,
   };
 }

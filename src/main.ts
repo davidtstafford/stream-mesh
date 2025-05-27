@@ -11,6 +11,8 @@ import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
 import crypto from 'crypto';
+import express from 'express';
+import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -38,6 +40,7 @@ interface TTSSettings {
   includePlatformWithName: boolean;
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
+  muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   // Future: per-user overrides, blocklist, message prefix, etc.
 }
 
@@ -52,6 +55,7 @@ function loadTTSSettings(): TTSSettings {
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
+      muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
     };
   } catch {
     // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
@@ -160,10 +164,23 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('chat:fetch', async (_event, filters) => {
+    const { format } = filters || {};
     return new Promise((resolve, reject) => {
       fetchChatMessages(filters || {}, (err, rows) => {
         if (err) reject(err.message);
-        else resolve(rows);
+        else if (format === 'formatted') {
+          // Use backend formatting for each message
+          const { formatChatMessage } = require('./backend/services/chatFormatting');
+          resolve((rows || []).map((row: any) => formatChatMessage({
+            platform: row.platform,
+            channel: row.channel || '',
+            user: row.user,
+            message: row.text, // DB uses 'text', live uses 'message'
+            time: row.time,
+          })));
+        } else {
+          resolve(rows);
+        }
       });
     });
   });
@@ -422,17 +439,23 @@ app.whenReady().then(async () => {
         if (typeof ttsSettings.skipLargeNumbers === 'boolean' && ttsSettings.skipLargeNumbers) {
           ttsText = filterLargeNumbers(ttsText, true);
         }
+        // --- Mute native playback if overlays are connected and muteWhenActiveSource is true ---
+        const { getActiveTTSOverlayConnections } = require('./backend/services/obsIntegration');
+        const muteNative = !!ttsSettings.muteWhenActiveSource && getActiveTTSOverlayConnections() > 0;
         ttsQueue.enqueue({
           text: ttsText,
           user: event.user,
-          voiceId // If set, will override default
+          voiceId, // If set, will override default
+          muteNative,
         });
       });
     }
-    // Send live chat message to renderer for real-time update
+    // Send live chat message to renderer for real-time update (format for UI/OBS)
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
-      win.webContents.send('chat:live', event);
+      // Use backend formatting for live messages
+      const { formatChatMessage } = require('./backend/services/chatFormatting');
+      win.webContents.send('chat:live', formatChatMessage(event));
     }
   });
 
@@ -442,6 +465,24 @@ app.whenReady().then(async () => {
     if (win && win.webContents) {
       win.webContents.send('tts:queueChanged', length);
     }
+  });
+
+  // --- Express server for OBS overlays ---
+  const overlayServer = express();
+  // Enable CORS for all overlay endpoints
+  overlayServer.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+    } else {
+      next();
+    }
+  });
+  registerObsOverlayEndpoints(overlayServer);
+  overlayServer.listen(3001, () => {
+    console.log('Overlay server running on http://localhost:3001');
   });
 
   // Only create the window after all handlers are registered
@@ -463,3 +504,10 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+// After app/server is created:
+if (process.env.NODE_ENV !== 'test') {
+  // ...existing code to create express app...
+  // Remove this line, as we now use overlayServer for OBS endpoints
+  // registerObsOverlayEndpoints(app); // <-- Remove this line
+}

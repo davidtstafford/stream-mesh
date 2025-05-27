@@ -7,8 +7,9 @@
     "start": "concurrently \"npm:serve\" \"npm:electron\"",
     "serve": "webpack serve --config webpack.config.js --mode development",
     "electron": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
-    "build": "webpack --config webpack.config.js --mode production && npm run build-main",
-    "build-main": "tsc --project tsconfig.json --outDir dist --noEmit false"
+    "build": "webpack --config webpack.config.js --mode production && npm run build-main && npm run copy-obs-assets",
+    "build-main": "tsc --project tsconfig.json --outDir dist --noEmit false",
+    "copy-obs-assets": "node scripts/copy-obs-assets.js"
   },
   "keywords": [],
   "author": "",
