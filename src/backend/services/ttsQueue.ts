@@ -90,8 +90,13 @@ class TTSQueue extends EventEmitter {
       let command: string;
       const platform = os.platform();
       if (platform === 'win32') {
-        // Windows: Use PowerShell
-        command = `powershell -c (New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync();`;
+        // Windows: Use Windows Media Player for MP3 playback (supports mp3 natively)
+        // /play /close will play the file and close the player when done
+        // Use start to avoid blocking the process, but wait for a reasonable time
+        // Note: This will open the player window briefly
+        command = `start /min wmplayer "${filePath}" /play /close`;
+        // Fallback: try PowerShell with Windows 10+ (for mp3)
+        // command = `powershell -c (New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync();`;
       } else if (platform === 'darwin') {
         // macOS: Use afplay
         command = `afplay '${filePath.replace(/'/g, "'\\''")}'`;

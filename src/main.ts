@@ -109,8 +109,8 @@ function cleanUpTempTTSFiles() {
   const userDataDir = app.getPath('userData');
   const files = fs.readdirSync(userDataDir);
   for (const file of files) {
-    // Only delete files that match the temp TTS pattern
-    if (/^streammesh_tts_\d+\.wav$/.test(file)) {
+    // Only delete files that match the temp TTS pattern (mp3 or wav, for legacy)
+    if (/^streammesh_tts_\d+\.(mp3|wav)$/.test(file)) {
       try {
         fs.unlinkSync(path.join(userDataDir, file));
         console.log('[cleanup] Deleted temp TTS file:', file);
