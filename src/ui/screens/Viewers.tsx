@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import voicesJson from '../../shared/assets/pollyVoiceEngines.sorted.json';
+import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 
 // Use the preload-exposed ipcRenderer for secure IPC
 const ipcRenderer = window.electronAPI?.ipcRenderer;
@@ -96,8 +97,16 @@ const Viewers: React.FC = () => {
     setLoading(false);
   };
 
-  // Prepare voices for dropdown, ensure only one Not Set
-  const voices = voicesJson.filter(v => v.Name).map(v => ({ Name: v.Name, LanguageName: v.LanguageName }));
+
+  // Get disableNeuralVoices from TTS settings
+  const { disableNeuralVoices } = useTTSSettings();
+
+  // Prepare voices for dropdown, filter neural if needed, ensure only one Not Set
+  let filteredVoices = voicesJson.filter(v => v.Name);
+  if (disableNeuralVoices) {
+    filteredVoices = filteredVoices.filter(v => v.Engines && v.Engines.includes('standard'));
+  }
+  const voices = filteredVoices.map(v => ({ Name: v.Name, LanguageName: v.LanguageName }));
   voices.unshift({ Name: '', LanguageName: 'Not Set' });
 
   const filteredViewers = useMemo(() => {

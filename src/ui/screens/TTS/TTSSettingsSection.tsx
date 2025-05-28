@@ -10,6 +10,7 @@ interface TTSSettingsSectionProps {
     maxRepeatedChars: number;
     skipLargeNumbers: boolean;
     muteWhenActiveSource: boolean;
+    disableNeuralVoices: boolean;
   }) => void;
 }
 
@@ -28,6 +29,8 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     setSkipLargeNumbers,
     muteWhenActiveSource,
     setMuteWhenActiveSource,
+    disableNeuralVoices,
+    setDisableNeuralVoices,
   } = useTTSSettings();
 
   // Handlers
@@ -38,6 +41,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     if (!newValue) setIncludePlatformWithName(false);
   };
   const handleToggleIncludePlatform = () => setIncludePlatformWithName(!includePlatformWithName);
+  const handleToggleDisableNeural = () => setDisableNeuralVoices(!disableNeuralVoices);
   const handleSave = () => {
     onSave({
       enabled: ttsEnabled,
@@ -46,6 +50,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
       maxRepeatedChars,
       skipLargeNumbers,
       muteWhenActiveSource,
+      disableNeuralVoices,
     });
   };
 
@@ -55,6 +60,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
       </div>
+
       <div style={{ marginBottom: 16 }}>
         <label>
           <input type="checkbox" checked={ttsEnabled} onChange={handleToggleTts} disabled={!ttsSettingsLoaded} /> Enable TTS
@@ -62,6 +68,20 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
         <span style={{ marginLeft: 12, color: ttsEnabled ? '#2ecc40' : '#ff4d4f' }}>
           TTS is {ttsEnabled ? 'ON' : 'OFF'}
         </span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={disableNeuralVoices}
+            onChange={handleToggleDisableNeural}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          <b>Disable neural voices</b>
+        </label>
+        <div style={{ color: '#aaa', marginTop: 6, maxWidth: 520 }}>
+          <b>Note:</b> Neural voices sound more natural but cost significantly more on AWS Polly. When enabled, only standard voices will be available and used for TTS, reducing costs. Please save and refresh this screen to see the affects.
+        </div>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label>

@@ -90,7 +90,7 @@ class TTSQueue extends EventEmitter {
       let command: string;
       const platform = os.platform();
       if (platform === 'win32') {
-        // Windows: Use PowerShell
+        // Windows: Use PowerShell SoundPlayer for WAV only (now always .wav on Windows)
         command = `powershell -c (New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync();`;
       } else if (platform === 'darwin') {
         // macOS: Use afplay

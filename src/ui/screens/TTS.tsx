@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
+import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 import TTSVoiceSelector, { PollyVoiceSorted } from './TTS/TTSVoiceSelector';
 import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
@@ -37,6 +38,9 @@ const TTS: React.FC = () => {
   const [voices, setVoices] = useState<PollyVoiceSorted[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
   const [voicesLoaded, setVoicesLoaded] = useState(false);
+
+  // Get disableNeuralVoices from TTS settings
+  const { disableNeuralVoices } = useTTSSettings();
   const [showHelp, setShowHelp] = useState(false);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
   const [testAllOutput, setTestAllOutput] = useState('');
@@ -60,13 +64,17 @@ const TTS: React.FC = () => {
     return () => { isMounted = false; };
   }, []);
 
-  // Use shared/assets/pollyVoiceEngines.sorted.json for voice list
+
+  // Use shared/assets/pollyVoiceEngines.sorted.json for voice list, filter if neural disabled
   useEffect(() => {
     setVoicesLoaded(false);
-    // pollyVoiceEngines is imported as JSON
-    setVoices(pollyVoiceEngines as PollyVoiceSorted[]);
+    let allVoices = pollyVoiceEngines as PollyVoiceSorted[];
+    if (disableNeuralVoices) {
+      allVoices = allVoices.filter(v => v.Engines.includes('standard'));
+    }
+    setVoices(allVoices);
     setVoicesLoaded(true);
-  }, []);
+  }, [disableNeuralVoices]);
 
   // Set selectedVoice only after both config and voices are loaded
   useEffect(() => {
