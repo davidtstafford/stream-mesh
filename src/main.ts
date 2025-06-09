@@ -17,6 +17,9 @@ const authFilePath = path.join(userDataPath, 'auth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 
+// Track event windows
+const eventWindows = new Map<string, BrowserWindow>();
+
 function saveTwitchAuth(auth: { username: string, accessToken: string }) {
   fs.writeFileSync(authFilePath, JSON.stringify(auth, null, 2), 'utf-8');
 }
@@ -410,6 +413,106 @@ app.whenReady().then(async () => {
     return { length: ttsQueue.getQueueLength() };
   });
 
+  // Event window management IPC handlers
+  console.log('🔧 Registering event window IPC handlers...');
+  ipcMain.handle('eventWindow:create', async (_event, windowId: string, config?: any) => {
+    console.log('🚀 eventWindow:create handler called with windowId:', windowId);
+    try {
+      // Don't create if window already exists
+      if (eventWindows.has(windowId)) {
+        const existingWindow = eventWindows.get(windowId);
+        if (existingWindow && !existingWindow.isDestroyed()) {
+          existingWindow.focus();
+          return { success: true, windowId };
+        }
+        // Clean up destroyed window reference
+        eventWindows.delete(windowId);
+      }
+
+      const eventWindow = new BrowserWindow({
+        width: config?.width || 800,
+        height: config?.height || 600,
+        x: config?.x || undefined,
+        y: config?.y || undefined,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          nodeIntegration: false,
+          contextIsolation: true
+        },
+        title: config?.title || 'Event Monitor',
+        alwaysOnTop: config?.alwaysOnTop || false,
+        frame: true,
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
+        closable: true
+      });
+
+      // Track the window
+      eventWindows.set(windowId, eventWindow);
+
+      // Clean up when window is closed
+      eventWindow.on('closed', () => {
+        eventWindows.delete(windowId);
+      });
+
+      // Load the same URL as main window but with a query parameter to identify it as an event window
+      if (isDev) {
+        eventWindow.loadURL(`http://localhost:3000?eventWindow=${windowId}&config=${encodeURIComponent(JSON.stringify(config || {}))}`);
+      } else {
+        eventWindow.loadFile(path.join(__dirname, 'index.html'), {
+          query: { eventWindow: windowId, config: JSON.stringify(config || {}) }
+        });
+      }
+
+      return { success: true, windowId };
+    } catch (error) {
+      console.error('Failed to create event window:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  console.log('🔧 Registering eventWindow:close handler...');
+  ipcMain.handle('eventWindow:close', async (_event, windowId: string) => {
+    try {
+      const window = eventWindows.get(windowId);
+      if (window && !window.isDestroyed()) {
+        window.close();
+        return { success: true };
+      }
+      return { success: false, error: 'Window not found or already closed' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  console.log('🔧 Registering eventWindow:list handler...');
+  ipcMain.handle('eventWindow:list', async () => {
+    const activeWindows: string[] = [];
+    for (const [windowId, window] of eventWindows.entries()) {
+      if (!window.isDestroyed()) {
+        activeWindows.push(windowId);
+      } else {
+        eventWindows.delete(windowId);
+      }
+    }
+    return activeWindows;
+  });
+
+  console.log('🔧 Registering eventWindow:updateTitle handler...');
+  ipcMain.handle('eventWindow:updateTitle', async (_event, windowId: string, title: string) => {
+    try {
+      const window = eventWindows.get(windowId);
+      if (window && !window.isDestroyed()) {
+        window.setTitle(title);
+        return { success: true };
+      }
+      return { success: false, error: 'Window not found or already closed' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   // Register IPC handler to open a local file
   ipcMain.handle('open-local-file', async (_event, relativePath: string) => {
     try {
@@ -583,6 +686,16 @@ app.whenReady().then(async () => {
       win.webContents.send('events:live', event);
     } else {
       console.log('No window available to forward event to'); // Debug log
+    }
+
+    // Also forward to all event windows
+    for (const [windowId, eventWindow] of eventWindows.entries()) {
+      if (!eventWindow.isDestroyed() && eventWindow.webContents) {
+        eventWindow.webContents.send('events:live', event);
+      } else {
+        // Clean up destroyed window reference
+        eventWindows.delete(windowId);
+      }
     }
   });
 
