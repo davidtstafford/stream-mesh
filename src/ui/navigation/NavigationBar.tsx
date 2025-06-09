@@ -18,10 +18,15 @@ const commandItems = [
   { label: 'System Commands', key: 'systemCommands' },
   { label: 'Custom Commands', key: 'customCommands' },
 ];
+const developerItems = [
+  { label: 'Event Simulator', key: 'developer' },
+  { label: 'Twitch Events', key: 'developerTwitch' },
+];
 
 const NavigationBar: React.FC<{ active: string, onNavigate: (key: string) => void }> = ({ active, onNavigate }) => {
   const [adminOpen, setAdminOpen] = useState(true);
   const [commandsOpen, setCommandsOpen] = useState(true);
+  const [developerOpen, setDeveloperOpen] = useState(true);
   return (
     <nav style={{ width: 240, background: '#181c20', color: '#fff', height: '100vh', fontFamily: 'sans-serif', fontWeight: 'bold', fontSize: 16 }}>
       <div style={{ textAlign: 'center', fontSize: 22, padding: '24px 0', borderBottom: '1px solid #333' }}>
@@ -51,6 +56,17 @@ const NavigationBar: React.FC<{ active: string, onNavigate: (key: string) => voi
         ))}
         <div onClick={() => setCommandsOpen(o => !o)} style={{ padding: '16px 24px', cursor: 'pointer', background: '#222', borderTop: '1px solid #333' }}>Commands {commandsOpen ? '▼' : '▶'}</div>
         {commandsOpen && commandItems.map(item => (
+          <div
+            key={item.key}
+            onClick={() => onNavigate(item.key)}
+            className={active === item.key ? 'active-nav' : ''}
+            style={{ padding: '12px 40px', cursor: 'pointer', fontWeight: 500 }}
+          >
+            {item.label}
+          </div>
+        ))}
+        <div onClick={() => setDeveloperOpen(o => !o)} style={{ padding: '16px 24px', cursor: 'pointer', background: '#222', borderTop: '1px solid #333' }}>Developer {developerOpen ? '▼' : '▶'}</div>
+        {developerOpen && developerItems.map(item => (
           <div
             key={item.key}
             onClick={() => onNavigate(item.key)}

@@ -13,6 +13,8 @@ import OBS from './screens/OBS/OBS';
 import Events from './screens/Events';
 import EventsAdmin from './screens/EventsAdmin';
 import EventHistory from './screens/EventHistory';
+import Developer from './screens/Developer';
+import DeveloperTwitch from './screens/DeveloperTwitch';
 import './theme/theme.css';
 
 const screenMap: Record<string, React.ReactNode> = {
@@ -28,6 +30,8 @@ const screenMap: Record<string, React.ReactNode> = {
   events: <Events />,
   eventsAdmin: <EventsAdmin />,
   eventHistory: <EventHistory />,
+  developer: <Developer />,
+  developerTwitch: <DeveloperTwitch />,
 };
 
 const App: React.FC = () => {

@@ -308,6 +308,21 @@ app.whenReady().then(async () => {
     });
   });
 
+  // Developer tools IPC handlers
+  ipcMain.handle('developer:triggerEvent', async (_event, eventData) => {
+    try {
+      console.log('Developer: Triggering event:', eventData);
+      
+      // Send the event through the eventBus using the correct method
+      eventBus.emitEvent(eventData);
+      
+      return { success: true, message: `Triggered ${eventData.type} event successfully` };
+    } catch (err) {
+      console.error('developer:triggerEvent error:', err);
+      throw err;
+    }
+  });
+
   // Twitch connection IPC handlers with error logging
   ipcMain.handle('twitch:connect', async (_event, username: string) => {
     try {
