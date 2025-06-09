@@ -1,7 +1,7 @@
 // Twitch integration service (MVP, extensible for more platforms)
 import { EventEmitter } from 'events';
 import tmi from 'tmi.js';
-import { chatBus } from './chatBus';
+import { eventBus } from './eventBus';
 
 export type Platform = 'twitch';
 
@@ -52,10 +52,12 @@ class PlatformIntegrationService extends EventEmitter {
     await this.twitchClient.connect();
     this.connections.twitch = { platform: 'twitch', username: auth.username, connected: true };
     this.emit('status', this.connections.twitch);
+    
     // Listen for chat messages and emit events
     this.twitchClient.on('message', (channel: string, tags: any, message: string, self: boolean) => {
       if (!self) {
         const chatEvent = {
+          type: 'chat' as const,
           platform: 'twitch',
           channel,
           user: tags['display-name'] || tags.username,
@@ -63,9 +65,111 @@ class PlatformIntegrationService extends EventEmitter {
           tags,
           time: new Date().toISOString(),
         };
-        chatBus.emitChatMessage(chatEvent);
+        eventBus.emitEvent(chatEvent);
         this.emit('chat', chatEvent); // (optional: for legacy or direct listeners)
       }
+    });
+
+    // Listen for subscription events
+    this.twitchClient.on('subscription', (channel: string, username: string, method: any, message: string, tags: any) => {
+      const subscriptionEvent = {
+        type: 'subscription' as const,
+        platform: 'twitch',
+        channel,
+        user: username,
+        message: message || undefined,
+        amount: parseInt(method?.prime ? '0' : method?.plan || '1000') / 1000, // Convert to tier (1, 2, 3)
+        data: { method, plan: method?.plan, isPrime: method?.prime },
+        tags,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(subscriptionEvent);
+      this.emit('subscription', subscriptionEvent);
+    });
+
+    // Listen for resubscription events
+    this.twitchClient.on('resub', (channel: string, username: string, months: number, message: string, tags: any, method: any) => {
+      const resubEvent = {
+        type: 'resub' as const,
+        platform: 'twitch',
+        channel,
+        user: username,
+        message: message || undefined,
+        amount: parseInt(method?.plan || '1000') / 1000, // Convert to tier
+        data: { months, method, plan: method?.plan, cumulativeMonths: tags?.['msg-param-cumulative-months'] },
+        tags,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(resubEvent);
+      this.emit('resub', resubEvent);
+    });
+
+    // Listen for gifted subscription events
+    this.twitchClient.on('subgift', (channel: string, username: string, streakMonths: number, recipient: string, method: any, tags: any) => {
+      const subgiftEvent = {
+        type: 'subgift' as const,
+        platform: 'twitch',
+        channel,
+        user: username,
+        message: undefined,
+        amount: parseInt(method?.plan || '1000') / 1000, // Convert to tier
+        data: { recipient, streakMonths, method, plan: method?.plan },
+        tags,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(subgiftEvent);
+      this.emit('subgift', subgiftEvent);
+    });
+
+    // Listen for cheer events (bits)
+    this.twitchClient.on('cheer', (channel: string, tags: any, message: string) => {
+      const cheerEvent = {
+        type: 'cheer' as const,
+        platform: 'twitch',
+        channel,
+        user: tags['display-name'] || tags.username,
+        message: message || undefined,
+        amount: parseInt(tags.bits || '0'),
+        data: { bits: tags.bits },
+        tags,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(cheerEvent);
+      this.emit('cheer', cheerEvent);
+    });
+
+    // Listen for host events
+    this.twitchClient.on('hosted', (channel: string, username: string, viewers: number, autohost: boolean) => {
+      const hostedEvent = {
+        type: 'hosted' as const,
+        platform: 'twitch',
+        channel,
+        user: username,
+        message: undefined,
+        amount: viewers,
+        data: { autohost },
+        tags: undefined,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(hostedEvent);
+      this.emit('hosted', hostedEvent);
+    });
+
+    // Listen for raid events
+    this.twitchClient.on('raided', (channel: string, username: string, viewers: number) => {
+      const raidedEvent = {
+        type: 'raided' as const,
+        platform: 'twitch',
+        channel,
+        user: username,
+        message: undefined,
+        amount: viewers,
+        data: undefined,
+        tags: undefined,
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(raidedEvent);
+      this.emit('raided', raidedEvent);
     });
     return this.connections.twitch;
   }

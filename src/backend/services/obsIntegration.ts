@@ -106,16 +106,24 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     res.setHeader('Connection', 'keep-alive');
     // Send keepalive
     const keepAlive = setInterval(() => res.write(':keepalive\n\n'), 25000);
-    // Listen for chat events
+    // Listen for chat events from the new eventBus
     const { formatChatMessage } = require('./chatFormatting');
-    const onChat = (msg: any) => {
-      res.write(`data: ${JSON.stringify(formatChatMessage(msg))}\n\n`);
+    const onChat = (event: any) => {
+      // Convert StreamEvent to ChatMessage format for formatting
+      const chatMessage = {
+        platform: event.platform,
+        channel: event.channel,
+        user: event.user,
+        message: event.message,
+        time: event.time,
+      };
+      res.write(`data: ${JSON.stringify(formatChatMessage(chatMessage))}\n\n`);
     };
-    const { chatBus } = require('./chatBus');
-    chatBus.on('chat', onChat);
+    const { eventBus } = require('./eventBus');
+    eventBus.onEventType('chat', onChat);
     req.on('close', () => {
       clearInterval(keepAlive);
-      chatBus.off('chat', onChat);
+      eventBus.off('event:chat', onChat);
       activeChatOverlayConnections = Math.max(0, activeChatOverlayConnections - 1);
     });
   });

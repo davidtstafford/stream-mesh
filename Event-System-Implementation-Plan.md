@@ -9,23 +9,23 @@ This plan implements a comprehensive event system for Stream Mesh that replaces 
 **Goal**: Create unified event bus that handles ALL events and maintains compatibility with existing systems.
 
 ### 1.1 Core Event System
-- [ ] Create new `eventBus.ts` service to replace `chatBus.ts`
-- [ ] Define unified `StreamEvent` interface for all event types
-- [ ] Implement event emission and subscription methods
-- [ ] Add event filtering capabilities
+- [x] Create new `eventBus.ts` service to replace `chatBus.ts`
+- [x] Define unified `StreamEvent` interface for all event types
+- [x] Implement event emission and subscription methods
+- [x] Add event filtering capabilities
 
 ### 1.2 Database Schema
-- [ ] Create new `events` table in database
-- [ ] Add database functions for event storage/retrieval
-- [ ] Implement dual-write system (events + chat tables for compatibility)
-- [ ] Add database migration logic
+- [x] Create new `events` table in database
+- [x] Add database functions for event storage/retrieval
+- [x] Implement dual-write system (events + chat tables for compatibility)
+- [x] Add database migration logic
 
 ### 1.3 Backward Compatibility
-- [ ] Update TTS integration to use new event bus (filter for chat events)
-- [ ] Update chat screen to receive events from new event bus
-- [ ] Update OBS chat overlay to work with new event system
-- [ ] Update viewer management to work with new events
-- [ ] Ensure all existing functionality continues to work
+- [x] Update TTS integration to use new event bus (filter for chat events)
+- [x] Update chat screen to receive events from new event bus
+- [x] Update OBS chat overlay to work with new event system
+- [x] Update viewer management to work with new events
+- [x] Ensure all existing functionality continues to work
 
 ---
 

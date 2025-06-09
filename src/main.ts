@@ -2,11 +2,11 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer } from './backend/core/database';
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
 import { chatBus } from './backend/services/chatBus';
-import { registerChatBusDbListener } from './backend/core/database';
+import { eventBus } from './backend/services/eventBus';
 import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
@@ -151,7 +151,7 @@ function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6):
 app.whenReady().then(async () => {
   cleanUpTempTTSFiles();
   initDatabase();
-  registerChatBusDbListener();
+  registerEventBusDbListener();
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
 
   // Auto-connect to Twitch if credentials exist
@@ -213,6 +213,98 @@ app.whenReady().then(async () => {
         if (err) reject(err.message);
         else resolve(true);
       });
+    });
+  });
+
+  // Event system IPC handlers
+  ipcMain.handle('events:fetch', async (_event, filters) => {
+    return new Promise((resolve, reject) => {
+      fetchEvents(filters || {}, (err, rows) => {
+        if (err) reject(err.message);
+        else resolve(rows || []);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteAll', async () => {
+    return new Promise((resolve, reject) => {
+      deleteAllEvents(err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteById', async (_event, id) => {
+    return new Promise((resolve, reject) => {
+      deleteEventById(id, err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteByType', async (_event, type) => {
+    return new Promise((resolve, reject) => {
+      deleteEventsByType(type, err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:count', async (_event, filters) => {
+    return new Promise((resolve, reject) => {
+      countEvents(filters || {}, (err, count) => {
+        if (err) reject(err.message);
+        else resolve(count || 0);
+      });
+    });
+  });
+
+  // Event configuration IPC handlers (using settings table)
+  ipcMain.handle('eventConfig:load', async () => {
+    return new Promise((resolve, reject) => {
+      fetchSettings((err, rows) => {
+        if (err) reject(err.message);
+        else {
+          // Filter only event-related settings and convert to config format
+          const eventSettings = (rows || []).filter((setting: any) => 
+            setting.key.startsWith('event_config_')
+          );
+          const configs: Record<string, any> = {};
+          eventSettings.forEach((setting: any) => {
+            const eventType = setting.key.replace('event_config_', '');
+            try {
+              configs[eventType] = JSON.parse(setting.value || '{}');
+            } catch {
+              configs[eventType] = {};
+            }
+          });
+          resolve(configs);
+        }
+      });
+    });
+  });
+
+  ipcMain.handle('eventConfig:save', async (_event, configs) => {
+    return new Promise((resolve, reject) => {
+      const { upsertSetting } = require('./backend/core/database');
+      const promises = Object.entries(configs).map(([eventType, config]) => 
+        new Promise<void>((res, rej) => {
+          upsertSetting({
+            key: `event_config_${eventType}`,
+            value: JSON.stringify(config)
+          }, (err: Error | null) => {
+            if (err) rej(err);
+            else res();
+          });
+        })
+      );
+      
+      Promise.all(promises)
+        .then(() => resolve(true))
+        .catch(err => reject(err.message));
     });
   });
 
@@ -398,8 +490,14 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Listen to chatBus and enqueue chat messages for TTS
-  chatBus.onChatMessage((event) => {
+  // Listen to eventBus and enqueue chat messages for TTS (filter for chat events only)
+  eventBus.onEventType('chat', (event) => {
+    // Skip if no message (shouldn't happen for chat events, but type safety)
+    if (!event.message) return;
+    
+    // Type-safe access to message
+    const messageText = event.message;
+
     // --- Upsert viewer on every chat message ---
     // Generate a unique viewer id as a hash of platform and user id
     const platformUserId = event.tags?.['user-id'] || event.user;
@@ -432,7 +530,7 @@ app.whenReady().then(async () => {
           }
         }
         if (ttsDisabled) return; // Do not enqueue if TTS is disabled for this user
-        let ttsText = event.message;
+        let ttsText = messageText;
         if (ttsSettings.readNameBeforeMessage && event.user) {
           let namePart = event.user;
           if (ttsSettings.includePlatformWithName && event.platform) {
@@ -473,6 +571,14 @@ app.whenReady().then(async () => {
       // Use backend formatting for live messages
       const { formatChatMessage } = require('./backend/services/chatFormatting');
       win.webContents.send('chat:live', formatChatMessage(event));
+    }
+  });
+
+  // --- Forward all events from eventBus to renderer for Events screen ---
+  eventBus.onEvent((event: any) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && win.webContents) {
+      win.webContents.send('events:live', event);
     }
   });
 

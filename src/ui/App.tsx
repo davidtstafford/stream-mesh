@@ -10,6 +10,9 @@ import Viewers from './screens/Viewers';
 import SystemCommands from './screens/SystemCommands';
 import CustomCommands from './screens/CustomCommands';
 import OBS from './screens/OBS/OBS';
+import Events from './screens/Events';
+import EventsAdmin from './screens/EventsAdmin';
+import EventHistory from './screens/EventHistory';
 import './theme/theme.css';
 
 const screenMap: Record<string, React.ReactNode> = {
@@ -22,6 +25,9 @@ const screenMap: Record<string, React.ReactNode> = {
   systemCommands: <SystemCommands />, 
   customCommands: <CustomCommands />, 
   obs: <OBS />,
+  events: <Events />,
+  eventsAdmin: <EventsAdmin />,
+  eventHistory: <EventHistory />,
 };
 
 const App: React.FC = () => {
