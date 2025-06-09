@@ -17,6 +17,25 @@ interface EventDisplayConfig {
   displayName: string;
 }
 
+interface PlatformEventGroup {
+  platform: string;
+  displayName: string;
+  types: string[];
+}
+
+const platformGroups: PlatformEventGroup[] = [
+  {
+    platform: 'general',
+    displayName: 'General',
+    types: ['chat']
+  },
+  {
+    platform: 'twitch',
+    displayName: 'Twitch',
+    types: ['subscription', 'resub', 'subgift', 'cheer', 'hosted', 'raided']
+  }
+];
+
 const defaultConfigs: Record<string, EventDisplayConfig> = {
   chat: { enabled: true, color: '#3a8dde', displayName: 'Chat Messages' },
   subscription: { enabled: true, color: '#9147ff', displayName: 'New Subscriptions' },
@@ -211,33 +230,52 @@ const Events: React.FC = () => {
 
       {/* Event Type Toggles */}
       <div style={{ marginBottom: 24 }}>
-        <h3 style={{ marginBottom: 12, fontSize: 16 }}>Event Types:</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {eventTypes.map(type => {
-            const config = displayConfigs[type];
-            const isActive = activeTypes.has(type);
-            return (
-              <button
-                key={type}
-                onClick={() => toggleEventType(type)}
-                style={{
-                  background: isActive ? config.color : '#444',
-                  color: isActive ? '#000' : '#fff',
-                  border: `2px solid ${config.color}`,
-                  padding: '8px 16px',
-                  borderRadius: 20,
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: 14,
-                  transition: 'all 0.2s',
-                  opacity: isActive ? 1 : 0.6,
-                }}
-              >
-                {config.displayName}
-              </button>
-            );
-          })}
-        </div>
+        <h3 style={{ marginBottom: 16, fontSize: 16 }}>Event Types:</h3>
+        {platformGroups.map((platformGroup, index) => {
+          const platformTypes = platformGroup.types.filter(type => displayConfigs[type]?.enabled);
+          if (platformTypes.length === 0) return null;
+          
+          return (
+            <div key={platformGroup.platform} style={{ marginBottom: 16 }}>
+              <h4 style={{ 
+                color: '#ffd700', 
+                fontSize: 14, 
+                marginBottom: 8, 
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: 1
+              }}>
+                📡 {platformGroup.displayName}
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {platformTypes.map(type => {
+                  const config = displayConfigs[type];
+                  const isActive = activeTypes.has(type);
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => toggleEventType(type)}
+                      style={{
+                        background: isActive ? config.color : '#444',
+                        color: isActive ? '#000' : '#fff',
+                        border: `2px solid ${config.color}`,
+                        padding: '8px 16px',
+                        borderRadius: 20,
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: 14,
+                        transition: 'all 0.2s',
+                        opacity: isActive ? 1 : 0.6,
+                      }}
+                    >
+                      {config.displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Events Display */}
