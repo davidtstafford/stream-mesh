@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import NavigationBar from './navigation/NavigationBar';
 import LinkToStreams from './screens/LinkToStreams';
-import Chat from './screens/Chat';
-import ChatHistory from './screens/ChatHistory';
 import Preferences from './screens/Preferences';
 import TTS from './screens/TTS';
 import Viewers from './screens/Viewers';
@@ -19,8 +17,6 @@ import './theme/theme.css';
 
 const screenMap: Record<string, React.ReactNode> = {
   link: <LinkToStreams />, 
-  chat: <Chat />, 
-  chatHistory: <ChatHistory />, 
   preferences: <Preferences />, 
   tts: <TTS />, 
   viewers: <Viewers />, 

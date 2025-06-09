@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 
 const navItems = [
   { label: 'Link to Streams', key: 'link' },
-  { label: 'Chat', key: 'chat' },
   { label: 'Events', key: 'events' },
 ];
 const adminItems = [
-  { label: 'Chat History', key: 'chatHistory' },
   { label: 'Event History', key: 'eventHistory' },
   { label: 'Preferences', key: 'preferences' },
   { label: 'TTS', key: 'tts' },
