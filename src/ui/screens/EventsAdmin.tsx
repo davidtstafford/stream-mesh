@@ -152,7 +152,8 @@ const EventsAdmin: React.FC = () => {
                     color: '#fff',
                     padding: '8px 12px',
                     borderRadius: 4,
-                    width: '100%',
+                    width: '140px',
+                    maxWidth: '140px',
                     fontFamily: 'inherit'
                   }}
                 />
