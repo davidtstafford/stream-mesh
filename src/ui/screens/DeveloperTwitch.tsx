@@ -7,7 +7,8 @@ const DeveloperTwitch: React.FC = () => {
     message: 'Hello from custom test!',
     amount: 100,
     months: 6,
-    recipient: 'LuckyViewer'
+    recipient: 'LuckyViewer',
+    rewardTitle: 'Song Request'
   });
 
   const triggerEvent = async (eventType: string, eventData: any) => {
@@ -120,6 +121,23 @@ const DeveloperTwitch: React.FC = () => {
         user: customData.username,
         amount: customData.amount
       })
+    },
+    {
+      name: 'Channel Point Redemption',
+      type: 'redeem',
+      description: 'User redeems channel points reward',
+      icon: '🎁',
+      color: '#00ff88',
+      getData: () => ({ 
+        user: customData.username,
+        amount: customData.amount,
+        message: customData.message,
+        data: { 
+          rewardTitle: customData.rewardTitle,
+          rewardCost: customData.amount,
+          userInput: customData.message
+        }
+      })
     }
   ];
 
@@ -132,6 +150,12 @@ const DeveloperTwitch: React.FC = () => {
       { type: 'chat', data: { user: 'Viewer2', message: 'Welcome NewSub!' }},
       { type: 'cheer', data: { user: 'CheerLeader', amount: 500, message: 'Great stream!' }},
       { type: 'chat', data: { user: 'Viewer3', message: 'PogChamp' }},
+      { type: 'redeem', data: { 
+        user: 'RewardFan', 
+        amount: 250, 
+        message: 'Can you do a backflip?',
+        data: { rewardTitle: 'Physical Challenge', rewardCost: 250, userInput: 'Can you do a backflip?' }
+      }},
       { type: 'resub', data: { user: 'LoyalFan', data: { months: 24 }, message: '2 years strong!' }},
       { type: 'raided', data: { user: 'BigStreamer', amount: 150 }},
       { type: 'chat', data: { user: 'RaidViewer1', message: 'Hey from the raid!' }},
@@ -257,6 +281,26 @@ const DeveloperTwitch: React.FC = () => {
               type="text"
               value={customData.recipient}
               onChange={(e) => setCustomData(prev => ({ ...prev, recipient: e.target.value }))}
+              style={{
+                width: '100%',
+                background: '#333',
+                border: '1px solid #555',
+                color: '#fff',
+                padding: '8px 12px',
+                borderRadius: 4,
+                fontFamily: 'inherit'
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: 8, color: '#aaa', fontSize: 14 }}>
+              Reward Title:
+            </label>
+            <input
+              type="text"
+              value={customData.rewardTitle}
+              onChange={(e) => setCustomData(prev => ({ ...prev, rewardTitle: e.target.value }))}
               style={{
                 width: '100%',
                 background: '#333',

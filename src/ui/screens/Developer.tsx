@@ -74,6 +74,22 @@ const Developer: React.FC = () => {
       data: { user: 'RaidingStreamer', amount: 50 },
       color: '#ff4500',
       icon: '⚡'
+    },
+    {
+      name: 'Channel Point Redemption',
+      type: 'redeem',
+      data: { 
+        user: 'RewardRedeemer', 
+        amount: 500,
+        message: 'Please play my favorite song!',
+        data: { 
+          rewardTitle: 'Song Request',
+          rewardCost: 500,
+          userInput: 'Please play my favorite song!'
+        }
+      },
+      color: '#00ff88',
+      icon: '🎁'
     }
   ];
 

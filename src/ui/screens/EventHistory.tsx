@@ -121,6 +121,19 @@ const EventHistory: React.FC = () => {
       case 'raided':
         displayText = `Raided with ${event.amount || 0} viewers`;
         break;
+      case 'redeem':
+        try {
+          const data = event.data ? JSON.parse(event.data) : {};
+          const rewardTitle = data.rewardTitle || 'Unknown Reward';
+          const cost = event.amount || 0;
+          displayText = `Redeemed "${rewardTitle}" (${cost} points)`;
+          if (event.message) {
+            displayText += ` - "${event.message}"`;
+          }
+        } catch {
+          displayText = 'Channel Point Redemption';
+        }
+        break;
       default:
         displayText = event.message || event.type;
     }
@@ -137,6 +150,7 @@ const EventHistory: React.FC = () => {
       cheer: '#ffd700',
       hosted: '#ff7f50',
       raided: '#ff4500',
+      redeem: '#00ff88',
     };
     return colors[type] || '#aaa';
   };

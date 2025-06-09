@@ -32,6 +32,7 @@ const defaultPlatformConfigs: PlatformEventConfigs[] = [
       { type: 'cheer', enabled: true, showInEvents: true, color: '#ffd700', displayName: 'Bit Cheers' },
       { type: 'hosted', enabled: true, showInEvents: true, color: '#ff7f50', displayName: 'Hosts' },
       { type: 'raided', enabled: true, showInEvents: true, color: '#ff4500', displayName: 'Raids' },
+      { type: 'redeem', enabled: true, showInEvents: true, color: '#00ff88', displayName: 'Channel Point Redemptions' },
     ]
   }
 ];

@@ -32,7 +32,7 @@ const platformGroups: PlatformEventGroup[] = [
   {
     platform: 'twitch',
     displayName: 'Twitch',
-    types: ['subscription', 'resub', 'subgift', 'cheer', 'hosted', 'raided']
+    types: ['subscription', 'resub', 'subgift', 'cheer', 'hosted', 'raided', 'redeem']
   }
 ];
 
@@ -44,16 +44,49 @@ const defaultConfigs: Record<string, EventDisplayConfig> = {
   cheer: { enabled: true, color: '#ffd700', displayName: 'Bit Cheers' },
   hosted: { enabled: true, color: '#ff7f50', displayName: 'Hosts' },
   raided: { enabled: true, color: '#ff4500', displayName: 'Raids' },
+  redeem: { enabled: true, color: '#00ff88', displayName: 'Channel Point Redemptions' },
 };
 
 const Events: React.FC = () => {
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [displayConfigs, setDisplayConfigs] = useState(defaultConfigs);
-  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(Object.keys(defaultConfigs)));
+  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
   const eventsRef = useRef<HTMLDivElement>(null);
+
+  // Load saved toggle state from localStorage
+  const loadToggleState = () => {
+    try {
+      const saved = localStorage.getItem('events-active-types');
+      if (saved) {
+        return new Set(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Failed to load toggle state:', error);
+    }
+    return new Set(Object.keys(defaultConfigs));
+  };
+
+  // Save toggle state to localStorage
+  const saveToggleState = (activeTypes: Set<string>) => {
+    try {
+      localStorage.setItem('events-active-types', JSON.stringify(Array.from(activeTypes)));
+    } catch (error) {
+      console.error('Failed to save toggle state:', error);
+    }
+  };
+
+  // Filter events to last 30 minutes
+  const filterRecentEvents = (events: StreamEvent[]) => {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    return events.filter(event => new Date(event.time) >= thirtyMinutesAgo);
+  };
 
   // Load event configurations and set up real-time streaming
   useEffect(() => {
+    // Load saved toggle state first
+    const savedToggleState = loadToggleState();
+    setActiveTypes(savedToggleState as Set<string>);
+
     // Load event display configurations
     const loadConfigs = async () => {
       try {
@@ -72,25 +105,21 @@ const Events: React.FC = () => {
             }
           });
           setDisplayConfigs(mergedConfigs);
-          
-          // Update active types to only include enabled types
-          const enabledTypes = Object.entries(mergedConfigs)
-            .filter(([_, config]) => config.enabled)
-            .map(([type, _]) => type);
-          setActiveTypes(new Set(enabledTypes));
         }
       } catch (error) {
         console.error('Failed to load event configurations:', error);
       }
     };
 
-    // Load recent events from database
+    // Load recent events from database (last 30 minutes)
     const loadRecentEvents = async () => {
       try {
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         const recentEvents = await window.electron.ipcRenderer.invoke('events:fetch', {
-          limit: 50, // Get last 50 events
+          limit: 100, // Get more events to ensure we have enough after filtering
           orderBy: 'time',
-          orderDirection: 'DESC'
+          orderDirection: 'ASC', // Changed to ascending - latest first
+          dateFrom: thirtyMinutesAgo // Only get events from last 30 minutes
         });
         
         // Convert database events to UI format
@@ -105,7 +134,8 @@ const Events: React.FC = () => {
           time: event.time
         }));
         
-        setEvents(formattedEvents.reverse()); // Reverse to show oldest first
+        // Filter to last 30 minutes and set (already in correct order)
+        setEvents(filterRecentEvents(formattedEvents));
       } catch (error) {
         console.error('Failed to load recent events:', error);
       }
@@ -125,8 +155,18 @@ const Events: React.FC = () => {
         time: event.time
       };
       
-      setEvents(prev => [...prev, formattedEvent]);
+      // Add new event at the beginning (latest first)
+      setEvents(prev => {
+        const updated = [formattedEvent, ...prev];
+        // Keep only last 30 minutes and limit to reasonable number
+        return filterRecentEvents(updated).slice(0, 100);
+      });
     };
+
+    // Set up periodic cleanup to remove old events
+    const cleanupInterval = setInterval(() => {
+      setEvents(prev => filterRecentEvents(prev));
+    }, 60000); // Clean up every minute
 
     // Register listener for live events
     window.electron.ipcRenderer.on('events:live', handleLiveEvent);
@@ -138,13 +178,14 @@ const Events: React.FC = () => {
     // Cleanup listener on unmount
     return () => {
       window.electron.ipcRenderer.removeAllListeners('events:live');
+      clearInterval(cleanupInterval);
     };
   }, []);
 
-  // Auto-scroll to bottom when new events arrive
+  // Auto-scroll to top when new events arrive (since latest are at top now)
   useEffect(() => {
-    if (eventsRef.current) {
-      eventsRef.current.scrollTop = eventsRef.current.scrollHeight;
+    if (eventsRef.current && events.length > 0) {
+      eventsRef.current.scrollTop = 0;
     }
   }, [events]);
 
@@ -156,6 +197,8 @@ const Events: React.FC = () => {
       } else {
         newSet.add(type);
       }
+      // Save the new state
+      saveToggleState(newSet);
       return newSet;
     });
   };
@@ -212,6 +255,16 @@ const Events: React.FC = () => {
             <strong>⚡ {event.user}</strong> raided with {event.amount || 0} viewers!
           </div>
         );
+      case 'redeem':
+        const rewardTitle = event.data?.rewardTitle || 'Unknown Reward';
+        const cost = event.amount || 0;
+        const userInput = event.message;
+        return (
+          <div style={{ color: config.color }}>
+            <strong>🎁 {event.user}</strong> redeemed "{rewardTitle}" ({cost} points)
+            {userInput && <div style={{ fontStyle: 'italic', marginTop: 4 }}>"{userInput}"</div>}
+          </div>
+        );
       default:
         return (
           <div style={{ color: config.color }}>
@@ -226,7 +279,12 @@ const Events: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', color: 'var(--text-color, #fff)', height: 'calc(100vh - 64px)' }}>
-      <h2 style={{ fontWeight: 'bold', marginBottom: 24 }}>Live Events</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h2 style={{ fontWeight: 'bold', margin: 0 }}>Live Events</h2>
+        <div style={{ fontSize: 14, color: '#888' }}>
+          Last 30 minutes • Latest first
+        </div>
+      </div>
 
       {/* Event Type Toggles */}
       <div style={{ marginBottom: 24 }}>
@@ -342,8 +400,8 @@ const Events: React.FC = () => {
       </div>
 
       <div style={{ marginTop: 16, fontSize: 14, color: '#666', textAlign: 'center' }}>
-        Showing {filteredEvents.length} of {events.length} events
-        {activeTypes.size < eventTypes.length && ` (${eventTypes.length - activeTypes.size} types hidden)`}
+        Showing {filteredEvents.length} of {events.length} events (last 30 minutes)
+        {activeTypes.size < eventTypes.length && ` • ${eventTypes.length - activeTypes.size} types hidden`}
       </div>
     </div>
   );

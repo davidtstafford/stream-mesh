@@ -171,6 +171,12 @@ class PlatformIntegrationService extends EventEmitter {
       eventBus.emitEvent(raidedEvent);
       this.emit('raided', raidedEvent);
     });
+
+    // Note: Channel point redemptions require EventSub integration
+    // tmi.js doesn't support channel points directly
+    // TODO: Implement EventSub WebSocket connection for channel.channel_points_custom_reward_redemption.add
+    // For now, redemption events can be triggered via developer tools
+    
     return this.connections.twitch;
   }
 
@@ -187,6 +193,34 @@ class PlatformIntegrationService extends EventEmitter {
 
   getTwitchStatus() {
     return this.connections.twitch;
+  }
+
+  // Manual method to trigger channel point redemption events
+  // This can be used for testing and will be replaced with EventSub integration later
+  triggerChannelPointRedemption(rewardTitle: string, username: string, userInput?: string, cost?: number) {
+    if (!this.connections.twitch.connected) {
+      throw new Error('Not connected to Twitch');
+    }
+
+    const redeemEvent = {
+      type: 'redeem' as const,
+      platform: 'twitch',
+      channel: this.connections.twitch.username,
+      user: username,
+      message: userInput || undefined,
+      amount: cost || 0,
+      data: { 
+        rewardTitle,
+        rewardCost: cost || 0,
+        userInput: userInput || null
+      },
+      tags: undefined,
+      time: new Date().toISOString(),
+    };
+    
+    eventBus.emitEvent(redeemEvent);
+    this.emit('redeem', redeemEvent);
+    return redeemEvent;
   }
 }
 
