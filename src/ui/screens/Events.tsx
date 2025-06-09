@@ -63,7 +63,8 @@ const Events: React.FC = () => {
         width: preset.width,
         height: preset.height,
         alwaysOnTop: preset.alwaysOnTop,
-        selectedTypes: preset.eventTypes
+        selectedTypes: preset.eventTypes,
+        customTitle: preset.name  // Pass the preset name as custom title
       });
 
       if (result.success) {

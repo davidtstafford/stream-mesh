@@ -49,7 +49,11 @@ const defaultConfigs: Record<string, EventDisplayConfig> = {
 
 interface EventWindowProps {
   windowId: string;
-  initialConfig?: any;
+  initialConfig?: {
+    selectedTypes?: string[];
+    customTitle?: string;
+    [key: string]: any;
+  };
   isStandalone?: boolean;
 }
 
@@ -330,6 +334,11 @@ const EventWindow: React.FC<EventWindowProps> = ({ windowId, initialConfig, isSt
   // Generate dynamic title for standalone windows
   const getDynamicTitle = () => {
     if (!isStandalone) return 'Live Events';
+    
+    // Use custom title from initialConfig if provided
+    if (initialConfig?.customTitle) {
+      return `Event Monitor - ${initialConfig.customTitle}`;
+    }
     
     if (activeTypes.size === 0) {
       return 'Event Monitor - No Events Selected';

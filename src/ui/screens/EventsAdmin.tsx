@@ -229,7 +229,7 @@ const EventsAdmin: React.FC = () => {
                   key={config.type}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '2fr 120px 140px 100px 120px',
+                    gridTemplateColumns: '1.8fr 120px 140px 100px 120px',
                     gap: 16,
                     alignItems: 'center',
                     padding: 16,
@@ -248,7 +248,7 @@ const EventsAdmin: React.FC = () => {
                         background: '#444',
                         color: '#fff',
                         border: '1px solid #666',
-                        padding: '8px 12px',
+                        padding: '8px 7px',
                         borderRadius: 4,
                         fontFamily: 'inherit'
                       }}
