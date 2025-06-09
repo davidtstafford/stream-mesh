@@ -139,6 +139,7 @@ const TTS: React.FC = () => {
     readNameBeforeMessage: boolean;
     includePlatformWithName: boolean;
     maxRepeatedChars: number;
+    maxRepeatedEmojis: number;
     skipLargeNumbers: boolean;
   }) => {
     setSaving(true);

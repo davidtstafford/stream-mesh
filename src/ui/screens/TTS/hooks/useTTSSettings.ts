@@ -5,6 +5,7 @@ export interface TTSSettings {
   readNameBeforeMessage: boolean;
   includePlatformWithName: boolean;
   maxRepeatedChars?: number;
+  maxRepeatedEmojis?: number;
   skipLargeNumbers?: boolean;
   muteWhenActiveSource?: boolean;
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
@@ -16,6 +17,7 @@ export function useTTSSettings() {
   const [readNameBeforeMessage, setReadNameBeforeMessage] = useState(false);
   const [includePlatformWithName, setIncludePlatformWithName] = useState(false);
   const [maxRepeatedChars, setMaxRepeatedChars] = useState(3);
+  const [maxRepeatedEmojis, setMaxRepeatedEmojis] = useState(3);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
   const [muteWhenActiveSource, setMuteWhenActiveSource] = useState(false);
   const [disableNeuralVoices, setDisableNeuralVoices] = useState(false);
@@ -28,6 +30,7 @@ export function useTTSSettings() {
       setReadNameBeforeMessage(!!settings.readNameBeforeMessage);
       setIncludePlatformWithName(!!settings.includePlatformWithName);
       setMaxRepeatedChars(typeof settings.maxRepeatedChars === 'number' ? settings.maxRepeatedChars : 3);
+      setMaxRepeatedEmojis(typeof settings.maxRepeatedEmojis === 'number' ? settings.maxRepeatedEmojis : 3);
       setSkipLargeNumbers(!!settings.skipLargeNumbers);
       setMuteWhenActiveSource(!!settings.muteWhenActiveSource);
       setDisableNeuralVoices(!!settings.disableNeuralVoices);
@@ -46,6 +49,8 @@ export function useTTSSettings() {
     setIncludePlatformWithName,
     maxRepeatedChars,
     setMaxRepeatedChars,
+    maxRepeatedEmojis,
+    setMaxRepeatedEmojis,
     skipLargeNumbers,
     setSkipLargeNumbers,
     muteWhenActiveSource,

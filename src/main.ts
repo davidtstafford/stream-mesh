@@ -39,6 +39,7 @@ interface TTSSettings {
   readNameBeforeMessage: boolean;
   includePlatformWithName: boolean;
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
+  maxRepeatedEmojis?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
@@ -55,13 +56,14 @@ function loadTTSSettings(): TTSSettings {
       readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
+      maxRepeatedEmojis: typeof parsed.maxRepeatedEmojis === 'number' ? parsed.maxRepeatedEmojis : 3,
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
       disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
     };
   } catch {
-    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, skipLargeNumbers: false, disableNeuralVoices: false };
+    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, maxRepeatedEmojis: 3, skipLargeNumbers: false, disableNeuralVoices: false };
   }
 }
 
@@ -128,6 +130,15 @@ function filterRepeatedChars(text: string, maxRepeats: number): string {
   return text.replace(/(.)\1{1,}/g, (match, char) => {
     if (/\p{Emoji}/u.test(char)) return match; // skip emoji
     return char.repeat(Math.min(match.length, maxRepeats));
+  });
+}
+
+// Utility to limit repeated emojis in a string
+function filterRepeatedEmojis(text: string, maxRepeats: number): string {
+  if (!maxRepeats || maxRepeats < 1) return text;
+  // Replace runs of the same emoji longer than maxRepeats
+  return text.replace(/(\p{Emoji})\1{1,}/gu, (match, emoji) => {
+    return emoji.repeat(Math.min(match.length, maxRepeats));
   });
 }
 
@@ -436,6 +447,10 @@ app.whenReady().then(async () => {
         // Apply repeated char filter
         if (typeof ttsSettings.maxRepeatedChars === 'number' && ttsSettings.maxRepeatedChars > 0) {
           ttsText = filterRepeatedChars(ttsText, ttsSettings.maxRepeatedChars);
+        }
+        // Apply repeated emoji filter
+        if (typeof ttsSettings.maxRepeatedEmojis === 'number' && ttsSettings.maxRepeatedEmojis > 0) {
+          ttsText = filterRepeatedEmojis(ttsText, ttsSettings.maxRepeatedEmojis);
         }
         // Apply large number filter
         if (typeof ttsSettings.skipLargeNumbers === 'boolean' && ttsSettings.skipLargeNumbers) {
