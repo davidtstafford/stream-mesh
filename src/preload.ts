@@ -10,8 +10,14 @@ contextBridge.exposeInMainWorld('api', {
 contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
-    on: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.on(channel, listener),
+    on: (channel: string, listener: (...args: any[]) => void) => {
+      // Wrap the listener to handle the event properly
+      const wrappedListener = (event: any, ...args: any[]) => listener(...args);
+      ipcRenderer.on(channel, wrappedListener);
+      return wrappedListener;
+    },
     removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
+    removeListener: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.removeListener(channel, listener),
   }
 });
 

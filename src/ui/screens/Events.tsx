@@ -51,6 +51,7 @@ const Events: React.FC = () => {
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [displayConfigs, setDisplayConfigs] = useState(defaultConfigs);
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
+  const [liveEventCount, setLiveEventCount] = useState(0); // Debug counter for live events
   const eventsRef = useRef<HTMLDivElement>(null);
 
   // Load saved toggle state from localStorage
@@ -83,6 +84,8 @@ const Events: React.FC = () => {
 
   // Load event configurations and set up real-time streaming
   useEffect(() => {
+    console.log('🟢 [Events.tsx] Component mounted, setting up event listener');
+    
     // Load saved toggle state first
     const savedToggleState = loadToggleState();
     setActiveTypes(savedToggleState as Set<string>);
@@ -105,9 +108,14 @@ const Events: React.FC = () => {
             }
           });
           setDisplayConfigs(mergedConfigs);
+        } else {
+          // No saved configs, use defaults
+          setDisplayConfigs(defaultConfigs);
         }
       } catch (error) {
         console.error('Failed to load event configurations:', error);
+        // Fall back to defaults
+        setDisplayConfigs(defaultConfigs);
       }
     };
 
@@ -118,7 +126,7 @@ const Events: React.FC = () => {
         const recentEvents = await window.electron.ipcRenderer.invoke('events:fetch', {
           limit: 100, // Get more events to ensure we have enough after filtering
           orderBy: 'time',
-          orderDirection: 'ASC', // Changed to ascending - latest first
+          orderDirection: 'DESC', // Latest first (descending order)
           dateFrom: thirtyMinutesAgo // Only get events from last 30 minutes
         });
         
@@ -134,7 +142,7 @@ const Events: React.FC = () => {
           time: event.time
         }));
         
-        // Filter to last 30 minutes and set (already in correct order)
+        // Filter to last 30 minutes and set (events from DB are in DESC order, so latest first)
         setEvents(filterRecentEvents(formattedEvents));
       } catch (error) {
         console.error('Failed to load recent events:', error);
@@ -143,6 +151,19 @@ const Events: React.FC = () => {
 
     // Set up real-time event listener
     const handleLiveEvent = (event: any) => {
+      console.log('🔴 [Events.tsx] Received live event:', event.type, 'from', event.platform);
+      
+      // Increment live event counter for debugging
+      setLiveEventCount(prev => prev + 1);
+      
+      // Add a window alert for testing (temporary)
+      if (typeof window !== 'undefined') {
+        (window as any).lastEvent = event;
+        (window as any).eventReceived = true;
+        (window as any).liveEventCount = (window as any).liveEventCount || 0;
+        (window as any).liveEventCount++;
+      }
+      
       // Convert event to UI format and add to events
       const formattedEvent: StreamEvent = {
         type: event.type,
@@ -155,11 +176,13 @@ const Events: React.FC = () => {
         time: event.time
       };
       
+      console.log('🔴 [Events.tsx] Formatted event for display');
+      
       // Add new event at the beginning (latest first)
       setEvents(prev => {
         const updated = [formattedEvent, ...prev];
-        // Keep only last 30 minutes and limit to reasonable number
-        return filterRecentEvents(updated).slice(0, 100);
+        const filtered = filterRecentEvents(updated).slice(0, 100);
+        return filtered;
       });
     };
 
@@ -168,8 +191,51 @@ const Events: React.FC = () => {
       setEvents(prev => filterRecentEvents(prev));
     }, 60000); // Clean up every minute
 
+    // Clear any existing listeners before adding new one
+    window.electron.ipcRenderer.removeAllListeners('events:live');
+    console.log('🔵 [Events.tsx] Setting up IPC listener for events:live');
+    
     // Register listener for live events
     window.electron.ipcRenderer.on('events:live', handleLiveEvent);
+    console.log('🔵 [Events.tsx] IPC listener registered successfully');
+
+    // TEMPORARY WORKAROUND: Poll for new events every 2 seconds as fallback
+    const pollInterval = setInterval(async () => {
+      try {
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const recentEvents = await window.electron.ipcRenderer.invoke('events:fetch', {
+          limit: 100,
+          orderBy: 'time',
+          orderDirection: 'DESC',
+          dateFrom: thirtyMinutesAgo
+        });
+        
+        const formattedEvents: StreamEvent[] = recentEvents.map((event: any) => ({
+          type: event.type,
+          platform: event.platform,
+          channel: event.channel,
+          user: event.user,
+          message: event.message,
+          amount: event.amount,
+          data: event.data ? JSON.parse(event.data) : undefined,
+          time: event.time
+        }));
+        
+        const filtered = filterRecentEvents(formattedEvents);
+        
+        // Only update if there are new events
+        setEvents(prev => {
+          if (filtered.length !== prev.length || 
+              (filtered.length > 0 && prev.length > 0 && filtered[0].time !== prev[0].time)) {
+            console.log('🟢 [Events.tsx] Polling detected', filtered.length - prev.length, 'new events');
+            return filtered;
+          }
+          return prev;
+        });
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 2000); // Poll every 2 seconds
 
     // Load initial data
     loadConfigs();
@@ -177,8 +243,10 @@ const Events: React.FC = () => {
 
     // Cleanup listener on unmount
     return () => {
+      console.log('🔴 [Events.tsx] Component unmounting, cleaning up event listener');
       window.electron.ipcRenderer.removeAllListeners('events:live');
       clearInterval(cleanupInterval);
+      clearInterval(pollInterval); // Clear polling interval
     };
   }, []);
 
@@ -282,7 +350,7 @@ const Events: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontWeight: 'bold', margin: 0 }}>Live Events</h2>
         <div style={{ fontSize: 14, color: '#888' }}>
-          Last 30 minutes • Latest first
+          Last 30 minutes • Latest first • Live events received: {liveEventCount}
         </div>
       </div>
 

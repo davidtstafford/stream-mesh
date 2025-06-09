@@ -5,18 +5,17 @@ import isDev from 'electron-is-dev';
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
-import { chatBus } from './backend/services/chatBus';
 import { eventBus } from './backend/services/eventBus';
 import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
-import crypto from 'crypto';
 import express from 'express';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
+const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 
 function saveTwitchAuth(auth: { username: string, accessToken: string }) {
   fs.writeFileSync(authFilePath, JSON.stringify(auth, null, 2), 'utf-8');
@@ -69,6 +68,19 @@ function loadTTSSettings(): TTSSettings {
 
 function saveTTSSettings(settings: TTSSettings) {
   fs.writeFileSync(ttsSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+function loadEventConfig(): Record<string, any> {
+  try {
+    const data = fs.readFileSync(eventConfigFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+function saveEventConfig(configs: Record<string, any>) {
+  fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -262,50 +274,24 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Event configuration IPC handlers (using settings table)
+  // Event configuration IPC handlers (using file storage)
   ipcMain.handle('eventConfig:load', async () => {
-    return new Promise((resolve, reject) => {
-      fetchSettings((err, rows) => {
-        if (err) reject(err.message);
-        else {
-          // Filter only event-related settings and convert to config format
-          const eventSettings = (rows || []).filter((setting: any) => 
-            setting.key.startsWith('event_config_')
-          );
-          const configs: Record<string, any> = {};
-          eventSettings.forEach((setting: any) => {
-            const eventType = setting.key.replace('event_config_', '');
-            try {
-              configs[eventType] = JSON.parse(setting.value || '{}');
-            } catch {
-              configs[eventType] = {};
-            }
-          });
-          resolve(configs);
-        }
-      });
-    });
+    try {
+      return loadEventConfig();
+    } catch (error) {
+      console.error('Failed to load event config:', error);
+      return {};
+    }
   });
 
   ipcMain.handle('eventConfig:save', async (_event, configs) => {
-    return new Promise((resolve, reject) => {
-      const { upsertSetting } = require('./backend/core/database');
-      const promises = Object.entries(configs).map(([eventType, config]) => 
-        new Promise<void>((res, rej) => {
-          upsertSetting({
-            key: `event_config_${eventType}`,
-            value: JSON.stringify(config)
-          }, (err: Error | null) => {
-            if (err) rej(err);
-            else res();
-          });
-        })
-      );
-      
-      Promise.all(promises)
-        .then(() => resolve(true))
-        .catch(err => reject(err.message));
-    });
+    try {
+      saveEventConfig(configs);
+      return true;
+    } catch (error) {
+      console.error('Failed to save event config:', error);
+      throw error;
+    }
   });
 
   // Developer tools IPC handlers
@@ -593,7 +579,10 @@ app.whenReady().then(async () => {
   eventBus.onEvent((event: any) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (win && win.webContents) {
+      console.log('Forwarding event to renderer:', event.type, event.user); // Debug log
       win.webContents.send('events:live', event);
+    } else {
+      console.log('No window available to forward event to'); // Debug log
     }
   });
 

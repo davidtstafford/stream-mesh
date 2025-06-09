@@ -50,15 +50,21 @@ const EventsAdmin: React.FC = () => {
     const loadConfigs = async () => {
       try {
         const savedConfigs = await window.electron.ipcRenderer.invoke('eventConfig:load');
-        // Merge saved configs with defaults
-        const mergedPlatformConfigs = defaultPlatformConfigs.map(platformConfig => ({
-          ...platformConfig,
-          events: platformConfig.events.map(defaultConfig => {
-            const savedConfig = savedConfigs[defaultConfig.type];
-            return savedConfig ? { ...defaultConfig, ...savedConfig } : defaultConfig;
-          })
-        }));
-        setPlatformConfigs(mergedPlatformConfigs);
+        
+        // Only merge if we actually have saved configs, otherwise keep defaults
+        if (savedConfigs && Object.keys(savedConfigs).length > 0) {
+          const mergedPlatformConfigs = defaultPlatformConfigs.map(platformConfig => ({
+            ...platformConfig,
+            events: platformConfig.events.map(defaultConfig => {
+              const savedConfig = savedConfigs[defaultConfig.type];
+              return savedConfig ? { ...defaultConfig, ...savedConfig } : defaultConfig;
+            })
+          }));
+          setPlatformConfigs(mergedPlatformConfigs);
+        } else {
+          // No saved configs found, use defaults
+          setPlatformConfigs(defaultPlatformConfigs);
+        }
       } catch (error) {
         console.error('Failed to load event configurations:', error);
         // Fall back to defaults
