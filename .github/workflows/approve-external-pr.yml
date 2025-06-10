@@ -1,0 +1,27 @@
+name: Approve External PR
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  approve-external-pr:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+    - name: Check if PR is from external fork
+      run: |
+        echo "This PR is from an external fork: ${{ github.event.pull_request.head.repo.full_name }}"
+        echo "A repository maintainer needs to add the 'safe-to-test' label to run builds."
+        echo "Review the changes carefully before adding this label!"
+        
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '🔒 **External PR Security Check**\n\nThis PR is from an external fork. A maintainer needs to review the changes and add the `safe-to-test` label to trigger the build checks.\n\n**⚠️ Maintainers**: Only add this label after carefully reviewing the changes, especially any modifications to GitHub Actions workflows.'
+          });
