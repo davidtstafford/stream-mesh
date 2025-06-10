@@ -1,16 +1,19 @@
 // Main Electron process
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
-import isDev from 'electron-is-dev';
+// Use require instead of import for potentially problematic packages
+const isDev = require('electron-is-dev');
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
 import { eventBus } from './backend/services/eventBus';
-import fs from 'fs';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
-import express from 'express';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
+
+// Use require for Node.js built-in modules and potentially problematic packages
+const fs = require('fs');
+const express = require('express') as typeof import('express');
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -95,7 +98,6 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     },
-    icon: path.join(__dirname, 'icon.png'),
     title: 'Stream Mesh'
   });
 
@@ -751,3 +753,16 @@ if (process.env.NODE_ENV !== 'test') {
   // Remove this line, as we now use overlayServer for OBS endpoints
   // registerObsOverlayEndpoints(app); // <-- Remove this line
 }
+
+// Add global error handling
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // In production, you might want to show a user-friendly error dialog
+  if (!isDev) {
+    console.error('Stack trace:', error.stack);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});

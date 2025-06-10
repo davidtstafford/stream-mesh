@@ -1,5 +1,5 @@
 // AWS Polly TTS service for Stream Mesh
-import AWS from 'aws-sdk';
+import Polly = require('aws-sdk/clients/polly');
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
@@ -15,14 +15,14 @@ export interface PollyConfig {
   engine?: string;
 }
 
-let polly: AWS.Polly | null = null;
+let polly: Polly | null = null;
 let pollyConfig: PollyConfig | null = null;
 
 const configFilePath = path.join(app.getPath('userData'), 'ttsConfig.json');
 
 export function configurePolly(config: PollyConfig) {
   pollyConfig = config;
-  polly = new AWS.Polly({
+  polly = new Polly({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
     region: config.region,
@@ -40,7 +40,7 @@ export function getPollyConfig(): PollyConfig | null {
     const data = fs.readFileSync(configFilePath, 'utf-8');
     const config = JSON.parse(data);
     pollyConfig = config;
-    polly = new AWS.Polly({
+    polly = new Polly({
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
       region: config.region,
@@ -99,7 +99,7 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
   let result;
   if (isWindows) {
     // Synthesize as PCM and wrap as WAV
-    const params: AWS.Polly.SynthesizeSpeechInput = {
+    const params: Polly.SynthesizeSpeechInput = {
       OutputFormat: 'pcm',
       Text: text,
       VoiceId: resolvedVoiceId,
@@ -116,7 +116,7 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
     fs.writeFileSync(filePath, wavBuffer);
   } else {
     // Synthesize as MP3 for browser/OBS compatibility
-    const params: AWS.Polly.SynthesizeSpeechInput = {
+    const params: Polly.SynthesizeSpeechInput = {
       OutputFormat: 'mp3',
       Text: text,
       VoiceId: resolvedVoiceId,
