@@ -55,6 +55,7 @@ yarn-error.log*
 # Only ignore root-level .json, not assets
 /*.json
 !package.json
+!package-lock.json
 !tsconfig.json
 
 # Ignore installer output
