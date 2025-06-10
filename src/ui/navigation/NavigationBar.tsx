@@ -18,8 +18,8 @@ const commandItems = [
   { label: 'Custom Commands', key: 'customCommands' },
 ];
 const TestingSimulationItems = [
-  { label: 'Event Simulator', key: 'TestingSimulation' },
-  { label: 'Twitch Events', key: 'TestingSimulationTwitch' },
+  { label: 'Event Simulator', key: 'developer' },
+  { label: 'Twitch Events', key: 'developerTwitch' },
 ];
 
 const NavigationBar: React.FC<{ active: string, onNavigate: (key: string) => void }> = ({ active, onNavigate }) => {

@@ -97,6 +97,33 @@ const Viewers: React.FC = () => {
     setLoading(false);
   };
 
+  // Delete all viewers
+  const handleDeleteAll = async () => {
+    if (!ipcRenderer) return;
+    if (viewers.length === 0) {
+      alert('No viewers to delete.');
+      return;
+    }
+    
+    const confirmMessage = `Are you sure you want to delete ALL ${viewers.length} viewers and their settings? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+    
+    setLoading(true);
+    try {
+      // Delete all viewers one by one (or implement a batch delete in backend if available)
+      for (const viewer of viewers) {
+        await ipcRenderer.invoke('deleteViewer', viewer.id);
+      }
+      setViewers([]);
+      setSettings([]);
+      setViewerSettings({});
+    } catch (error) {
+      console.error('Error deleting all viewers:', error);
+      alert('An error occurred while deleting viewers. Please try again.');
+    }
+    setLoading(false);
+  };
+
 
   // Get disableNeuralVoices from TTS settings
   const { disableNeuralVoices } = useTTSSettings();
@@ -155,6 +182,23 @@ const Viewers: React.FC = () => {
           <option value="false">TTS Enabled</option>
           <option value="true">TTS Disabled</option>
         </select>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            style={{ 
+              padding: '8px 16px', 
+              borderRadius: 4, 
+              background: '#c0392b', 
+              color: '#fff', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+            onClick={handleDeleteAll}
+            disabled={loading || viewers.length === 0}
+          >
+            Delete All ({viewers.length})
+          </button>
+        </div>
       </div>
       <table style={{ width: '100%', background: '#23272b', borderRadius: 8, borderCollapse: 'collapse' }}>
         <thead style={{ background: '#181c20' }}>
