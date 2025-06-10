@@ -3,6 +3,11 @@ name: Build and Release
 on:
   push:
     branches: [main]
+    # Only trigger on direct pushes to main, not from PRs
+    
+# Ensure only trusted pushes trigger releases
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -76,7 +81,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'davidtstafford/stream-mesh'
     
     permissions:
       contents: write

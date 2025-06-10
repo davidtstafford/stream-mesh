@@ -3,10 +3,24 @@ name: Build Check
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
 
 jobs:
+  # Only run if PR is from a repository collaborator or the same repository
+  security-check:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository || contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+    outputs:
+      safe-to-build: ${{ steps.check.outputs.safe }}
+    steps:
+    - name: Check if safe to build
+      id: check
+      run: echo "safe=true" >> $GITHUB_OUTPUT
+
   build-test:
+    needs: security-check
     runs-on: ${{ matrix.os }}
+    if: needs.security-check.outputs.safe-to-build == 'true'
     
     strategy:
       matrix:
