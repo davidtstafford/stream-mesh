@@ -44,8 +44,20 @@ jobs:
       run: |
         ls -la release/
         echo "Checking for DMG files..."
-        test -f "release/Stream Mesh-"*.dmg && echo "✅ Intel DMG found" || echo "❌ Intel DMG missing"
-        test -f "release/Stream Mesh-"*"-arm64.dmg" && echo "✅ ARM64 DMG found" || echo "❌ ARM64 DMG missing"
+        
+        # Check for Intel DMG (the one without -arm64 in the name)
+        if find release/ -name "Stream Mesh-*.dmg" -not -name "*-arm64.dmg" | grep -q .; then 
+          echo "✅ Intel DMG found"
+        else 
+          echo "❌ Intel DMG missing"
+        fi
+        
+        # Check for ARM64 DMG
+        if find release/ -name "Stream Mesh-*-arm64.dmg" | grep -q .; then 
+          echo "✅ ARM64 DMG found"
+        else 
+          echo "❌ ARM64 DMG missing"
+        fi
         
     - name: Verify build artifacts (Windows)
       if: matrix.os == 'windows-latest'
