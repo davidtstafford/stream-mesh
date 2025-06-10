@@ -1,0 +1,140 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Electron rebuild dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Ensure native dependencies are rebuilt for the target platform
+        npm run postinstall
+        
+    - name: Install Electron rebuild dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Ensure native dependencies are rebuilt for the target platform
+        npm run postinstall
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Build distribution (macOS)
+      if: matrix.os == 'macos-latest'
+      run: npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CI: true
+        DEBUG: electron-builder
+        
+    - name: Build distribution (Windows)
+      if: matrix.os == 'windows-latest'
+      run: npm run dist:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CI: true
+        DEBUG: electron-builder
+        
+    - name: Upload macOS artifacts
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-dist
+        path: |
+          release/*.dmg
+        retention-days: 7
+        
+    - name: Upload Windows artifacts
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-dist
+        path: |
+          release/*.exe
+        retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get package version
+      id: package-version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      
+    - name: Download macOS artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-dist
+        path: ./dist-artifacts/
+        
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-dist
+        path: ./dist-artifacts/
+        
+    - name: List downloaded artifacts
+      run: ls -la ./dist-artifacts/
+      
+    - name: Rename artifacts with cleaner names
+      run: |
+        cd ./dist-artifacts/
+        # Rename files to cleaner format
+        if [ -f "Stream Mesh-${{ steps.package-version.outputs.version }}.dmg" ]; then
+          mv "Stream Mesh-${{ steps.package-version.outputs.version }}.dmg" "StreamMesh-v${{ steps.package-version.outputs.version }}-macOS-Intel.dmg"
+        fi
+        if [ -f "Stream Mesh-${{ steps.package-version.outputs.version }}-arm64.dmg" ]; then
+          mv "Stream Mesh-${{ steps.package-version.outputs.version }}-arm64.dmg" "StreamMesh-v${{ steps.package-version.outputs.version }}-macOS-AppleSilicon.dmg"
+        fi
+        if [ -f "Stream Mesh Setup ${{ steps.package-version.outputs.version }}.exe" ]; then
+          mv "Stream Mesh Setup ${{ steps.package-version.outputs.version }}.exe" "StreamMesh-v${{ steps.package-version.outputs.version }}-Windows-Setup.exe"
+        fi
+        ls -la
+        
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ steps.package-version.outputs.version }}-${{ github.run_number }}" \
+          --title "Stream Mesh v${{ steps.package-version.outputs.version }} (Build ${{ github.run_number }})" \
+          --notes "**Stream Mesh v${{ steps.package-version.outputs.version }}**
+
+        Automatic release created from commit: ${{ github.sha }}
+
+        ## Download
+        - **macOS**: Download the appropriate DMG file for your Mac (Intel or Apple Silicon)
+        - **Windows**: Download the EXE installer
+
+        ## Changes
+        View the commit history for detailed changes since the last release." \
+          ./dist-artifacts/*.dmg \
+          ./dist-artifacts/*.exe
