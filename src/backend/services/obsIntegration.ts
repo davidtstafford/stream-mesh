@@ -1,10 +1,11 @@
 
 import path from 'path';
-import express from 'express';
+const express = require('express') as typeof import('express');
+import type { Request, Response, Express } from 'express';
 
 // --- OBS TTS Overlay Endpoint ---
 export let activeTTSOverlayConnections = 0;
-const ttsOverlayClients: express.Response[] = [];
+const ttsOverlayClients: Response[] = [];
 // Utility for main process to get active TTS overlay connections
 export function getActiveTTSOverlayConnections(): number {
   return activeTTSOverlayConnections;
@@ -30,7 +31,7 @@ export function getObsOverlayUrl(type: 'chat' | 'tts' | 'alerts' = 'chat'): stri
 // Track active SSE connections
 let activeChatOverlayConnections = 0;
 
-export function registerObsOverlayEndpoints(app: express.Express) {
+export function registerObsOverlayEndpoints(app: Express) {
   // Serve generated TTS audio files securely from Electron userData dir
   // Only allow files matching streammesh_tts_*.wav
   try {
@@ -38,7 +39,7 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const electronApp = require('electron').app;
     const fs = require('fs');
-    app.get('/tts-audio/:file', (req: express.Request, res: express.Response) => {
+    app.get('/tts-audio/:file', (req: Request, res: Response) => {
       const file = req.params.file;
       if (!/^streammesh_tts_\d+\.(mp3|wav)$/.test(file)) {
         return res.status(400).send('Invalid file name');
@@ -55,19 +56,19 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     console.warn('TTS audio endpoint not registered (not running in Electron main process)');
   }
   // Serve the TTS overlay HTML
-  app.get('/obs/tts', (_req: express.Request, res: express.Response) => {
+  app.get('/obs/tts', (_req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../ui/assets/ttsoverlay.html'));
   });
   // Serve the TTS overlay JS
-  app.get('/ui/assets/ttsoverlay.js', (_req: express.Request, res: express.Response) => {
+  app.get('/ui/assets/ttsoverlay.js', (_req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../ui/assets/ttsoverlay.js'));
   });
   // Endpoint to get the number of active TTS overlay connections
-  app.get('/obs/tts/connections', (_req: express.Request, res: express.Response) => {
+  app.get('/obs/tts/connections', (_req: Request, res: Response) => {
     res.json({ connections: activeTTSOverlayConnections });
   });
   // SSE endpoint for TTS events
-  app.get('/obs/tts/stream', (req: express.Request, res: express.Response) => {
+  app.get('/obs/tts/stream', (req: Request, res: Response) => {
     activeTTSOverlayConnections++;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -84,38 +85,46 @@ export function registerObsOverlayEndpoints(app: express.Express) {
     });
   });
   // Serve the overlay HTML
-  app.get('/obs/chat', (_req: express.Request, res: express.Response) => {
+  app.get('/obs/chat', (_req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../ui/assets/chatoverlay.html'));
   });
   // Serve the overlay JS
-  app.get('/ui/assets/chatoverlay.js', (_req: express.Request, res: express.Response) => {
+  app.get('/ui/assets/chatoverlay.js', (_req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../ui/assets/chatoverlay.js'));
   });
   // Serve the theme CSS (already handled if static, else add here)
 
   // Endpoint to get the number of active chat overlay connections
-  app.get('/obs/chat/connections', (_req: express.Request, res: express.Response) => {
+  app.get('/obs/chat/connections', (_req: Request, res: Response) => {
     res.json({ connections: activeChatOverlayConnections });
   });
 
   // SSE endpoint for chat messages
-  app.get('/obs/chat/stream', (req: express.Request, res: express.Response) => {
+  app.get('/obs/chat/stream', (req: Request, res: Response) => {
     activeChatOverlayConnections++;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     // Send keepalive
     const keepAlive = setInterval(() => res.write(':keepalive\n\n'), 25000);
-    // Listen for chat events
+    // Listen for chat events from the new eventBus
     const { formatChatMessage } = require('./chatFormatting');
-    const onChat = (msg: any) => {
-      res.write(`data: ${JSON.stringify(formatChatMessage(msg))}\n\n`);
+    const onChat = (event: any) => {
+      // Convert StreamEvent to ChatMessage format for formatting
+      const chatMessage = {
+        platform: event.platform,
+        channel: event.channel,
+        user: event.user,
+        message: event.message,
+        time: event.time,
+      };
+      res.write(`data: ${JSON.stringify(formatChatMessage(chatMessage))}\n\n`);
     };
-    const { chatBus } = require('./chatBus');
-    chatBus.on('chat', onChat);
+    const { eventBus } = require('./eventBus');
+    eventBus.onEventType('chat', onChat);
     req.on('close', () => {
       clearInterval(keepAlive);
-      chatBus.off('chat', onChat);
+      eventBus.off('event:chat', onChat);
       activeChatOverlayConnections = Math.max(0, activeChatOverlayConnections - 1);
     });
   });

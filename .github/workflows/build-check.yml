@@ -1,0 +1,82 @@
+name: Build Check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # Only run if PR is from a repository collaborator or the same repository
+  security-check:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository || contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+    outputs:
+      safe-to-build: ${{ steps.check.outputs.safe }}
+    steps:
+    - name: Check if safe to build
+      id: check
+      run: echo "safe=true" >> $GITHUB_OUTPUT
+
+  build-test:
+    needs: security-check
+    runs-on: ${{ matrix.os }}
+    if: needs.security-check.outputs.safe-to-build == 'true'
+    
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        
+    - name: Install dependencies
+      run: npm ci --ignore-scripts
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Test build distribution (macOS)
+      if: matrix.os == 'macos-latest'
+      run: npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Test build distribution (Windows)
+      if: matrix.os == 'windows-latest'
+      run: npm run dist:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Verify build artifacts (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        ls -la release/
+        echo "Checking for DMG files..."
+        
+        # Check for Intel DMG (the one without -arm64 in the name)
+        if find release/ -name "Stream Mesh-*.dmg" -not -name "*-arm64.dmg" | grep -q .; then 
+          echo "✅ Intel DMG found"
+        else 
+          echo "❌ Intel DMG missing"
+        fi
+        
+        # Check for ARM64 DMG
+        if find release/ -name "Stream Mesh-*-arm64.dmg" | grep -q .; then 
+          echo "✅ ARM64 DMG found"
+        else 
+          echo "❌ ARM64 DMG missing"
+        fi
+        
+    - name: Verify build artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        dir release\
+        echo "Checking for EXE file..."
+        if (Test-Path "release\Stream Mesh Setup*.exe") { Write-Host "✅ Windows EXE found" } else { Write-Host "❌ Windows EXE missing" }
+      shell: powershell

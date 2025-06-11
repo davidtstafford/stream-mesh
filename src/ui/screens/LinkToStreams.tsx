@@ -45,20 +45,6 @@ const LinkToStreams: React.FC = () => {
     >
       <section style={{ marginBottom: 32 }}>
         <h2 style={{ color: "#9147ff", fontWeight: "bold" }}>TWITCH</h2>
-        <input
-          type="text"
-          placeholder="eggiebert"
-          value={twitchUser}
-          onChange={(e) => setTwitchUser(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 8,
-            borderRadius: 4,
-            border: "1px solid #333",
-            marginBottom: 8,
-          }}
-          disabled={connected || loading}
-        />
         <div style={{ display: "flex", gap: 8 }}>
           <button
             disabled={connected || loading}
@@ -105,23 +91,6 @@ const LinkToStreams: React.FC = () => {
             <span style={{ fontWeight: "bold" }}>✔</span> Connected to Twitch
           </div>
         )}
-      </section>
-      <section>
-        <h2 style={{ color: "#ff0050", fontWeight: "bold" }}>TIKTOK</h2>
-        <p style={{ color: "#aaa" }}>TikTok integration coming soon.</p>
-        <button
-          disabled
-          style={{
-            background: "#ff0050",
-            color: "#fff",
-            padding: "8px 16px",
-            border: "none",
-            borderRadius: 4,
-            opacity: 0.5,
-          }}
-        >
-          Connect
-        </button>
       </section>
     </div>
   );

@@ -4,8 +4,12 @@ node_modules/
 # Build output
 dist/
 build/
+release/
 *.log
 *.tsbuildinfo
+*.dmg
+*.dmg.blockmap
+*.exe.blockmap
 
 # OS
 .DS_Store
@@ -21,6 +25,19 @@ Thumbs.db
 
 # Electron
 *.asar
+*.app
+.electron-gyp/
+
+# Electron-builder output
+*.dmg
+*.dmg.blockmap
+*.exe
+*.exe.blockmap
+*.appx
+*.snap
+*.pkg
+*.deb
+*.rpm
 
 # Misc
 npm-debug.log*
@@ -38,6 +55,7 @@ yarn-error.log*
 # Only ignore root-level .json, not assets
 /*.json
 !package.json
+!package-lock.json
 !tsconfig.json
 
 # Ignore installer output

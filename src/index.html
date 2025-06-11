@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stream Mesh</title>
     <link rel="icon" href="icon.png" />
+    <script>
+      // Simple polyfill for webpack var library target
+      window.exports = {};
+      window.module = { exports: window.exports };
+      if (typeof global === 'undefined') {
+        window.global = window;
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

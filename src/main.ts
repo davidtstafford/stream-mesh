@@ -1,22 +1,27 @@
 // Main Electron process
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
-import isDev from 'electron-is-dev';
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer } from './backend/core/database';
+// Use require instead of import for potentially problematic packages
+const isDev = require('electron-is-dev');
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
-import { chatBus } from './backend/services/chatBus';
-import { registerChatBusDbListener } from './backend/core/database';
-import fs from 'fs';
+import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
-import crypto from 'crypto';
-import express from 'express';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
+
+// Use require for Node.js built-in modules and potentially problematic packages
+const fs = require('fs');
+const express = require('express') as typeof import('express');
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
+const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
+
+// Track event windows
+const eventWindows = new Map<string, BrowserWindow>();
 
 function saveTwitchAuth(auth: { username: string, accessToken: string }) {
   fs.writeFileSync(authFilePath, JSON.stringify(auth, null, 2), 'utf-8');
@@ -39,6 +44,7 @@ interface TTSSettings {
   readNameBeforeMessage: boolean;
   includePlatformWithName: boolean;
   maxRepeatedChars?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
+  maxRepeatedEmojis?: number; // 0 = no limit, 2 = limit to 2, 3 = limit to 3 (default)
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
@@ -55,18 +61,32 @@ function loadTTSSettings(): TTSSettings {
       readNameBeforeMessage: typeof parsed.readNameBeforeMessage === 'boolean' ? parsed.readNameBeforeMessage : false,
       includePlatformWithName: typeof parsed.includePlatformWithName === 'boolean' ? parsed.includePlatformWithName : false,
       maxRepeatedChars: typeof parsed.maxRepeatedChars === 'number' ? parsed.maxRepeatedChars : 3,
+      maxRepeatedEmojis: typeof parsed.maxRepeatedEmojis === 'number' ? parsed.maxRepeatedEmojis : 3,
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
       disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
     };
   } catch {
-    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, skipLargeNumbers: false, disableNeuralVoices: false };
+    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3
+    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, maxRepeatedEmojis: 3, skipLargeNumbers: false, disableNeuralVoices: false };
   }
 }
 
 function saveTTSSettings(settings: TTSSettings) {
   fs.writeFileSync(ttsSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+function loadEventConfig(): Record<string, any> {
+  try {
+    const data = fs.readFileSync(eventConfigFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+function saveEventConfig(configs: Record<string, any>) {
+  fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -78,7 +98,6 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     },
-    icon: path.join(__dirname, 'icon.png'),
     title: 'Stream Mesh'
   });
 
@@ -131,6 +150,15 @@ function filterRepeatedChars(text: string, maxRepeats: number): string {
   });
 }
 
+// Utility to limit repeated emojis in a string
+function filterRepeatedEmojis(text: string, maxRepeats: number): string {
+  if (!maxRepeats || maxRepeats < 1) return text;
+  // Replace runs of the same emoji longer than maxRepeats
+  return text.replace(/(\p{Emoji})\1{1,}/gu, (match, emoji) => {
+    return emoji.repeat(Math.min(match.length, maxRepeats));
+  });
+}
+
 // Utility to filter large numbers from TTS text
 function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6): string {
   if (!skip) return text;
@@ -140,7 +168,7 @@ function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6):
 app.whenReady().then(async () => {
   cleanUpTempTTSFiles();
   initDatabase();
-  registerChatBusDbListener();
+  registerEventBusDbListener();
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
 
   // Auto-connect to Twitch if credentials exist
@@ -203,6 +231,87 @@ app.whenReady().then(async () => {
         else resolve(true);
       });
     });
+  });
+
+  // Event system IPC handlers
+  ipcMain.handle('events:fetch', async (_event, filters) => {
+    return new Promise((resolve, reject) => {
+      fetchEvents(filters || {}, (err, rows) => {
+        if (err) reject(err.message);
+        else resolve(rows || []);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteAll', async () => {
+    return new Promise((resolve, reject) => {
+      deleteAllEvents(err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteById', async (_event, id) => {
+    return new Promise((resolve, reject) => {
+      deleteEventById(id, err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:deleteByType', async (_event, type) => {
+    return new Promise((resolve, reject) => {
+      deleteEventsByType(type, err => {
+        if (err) reject(err.message);
+        else resolve(true);
+      });
+    });
+  });
+
+  ipcMain.handle('events:count', async (_event, filters) => {
+    return new Promise((resolve, reject) => {
+      countEvents(filters || {}, (err, count) => {
+        if (err) reject(err.message);
+        else resolve(count || 0);
+      });
+    });
+  });
+
+  // Event configuration IPC handlers (using file storage)
+  ipcMain.handle('eventConfig:load', async () => {
+    try {
+      return loadEventConfig();
+    } catch (error) {
+      console.error('Failed to load event config:', error);
+      return {};
+    }
+  });
+
+  ipcMain.handle('eventConfig:save', async (_event, configs) => {
+    try {
+      saveEventConfig(configs);
+      return true;
+    } catch (error) {
+      console.error('Failed to save event config:', error);
+      throw error;
+    }
+  });
+
+  // Developer tools IPC handlers
+  ipcMain.handle('developer:triggerEvent', async (_event, eventData) => {
+    try {
+      console.log('Developer: Triggering event:', eventData);
+      
+      // Send the event through the eventBus using the correct method
+      eventBus.emitEvent(eventData);
+      
+      return { success: true, message: `Triggered ${eventData.type} event successfully` };
+    } catch (err) {
+      console.error('developer:triggerEvent error:', err);
+      throw err;
+    }
   });
 
   // Twitch connection IPC handlers with error logging
@@ -306,6 +415,106 @@ app.whenReady().then(async () => {
     return { length: ttsQueue.getQueueLength() };
   });
 
+  // Event window management IPC handlers
+  console.log('🔧 Registering event window IPC handlers...');
+  ipcMain.handle('eventWindow:create', async (_event, windowId: string, config?: any) => {
+    console.log('🚀 eventWindow:create handler called with windowId:', windowId);
+    try {
+      // Don't create if window already exists
+      if (eventWindows.has(windowId)) {
+        const existingWindow = eventWindows.get(windowId);
+        if (existingWindow && !existingWindow.isDestroyed()) {
+          existingWindow.focus();
+          return { success: true, windowId };
+        }
+        // Clean up destroyed window reference
+        eventWindows.delete(windowId);
+      }
+
+      const eventWindow = new BrowserWindow({
+        width: config?.width || 800,
+        height: config?.height || 600,
+        x: config?.x || undefined,
+        y: config?.y || undefined,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          nodeIntegration: false,
+          contextIsolation: true
+        },
+        title: config?.title || 'Event Monitor',
+        alwaysOnTop: config?.alwaysOnTop || false,
+        frame: true,
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
+        closable: true
+      });
+
+      // Track the window
+      eventWindows.set(windowId, eventWindow);
+
+      // Clean up when window is closed
+      eventWindow.on('closed', () => {
+        eventWindows.delete(windowId);
+      });
+
+      // Load the same URL as main window but with a query parameter to identify it as an event window
+      if (isDev) {
+        eventWindow.loadURL(`http://localhost:3000?eventWindow=${windowId}&config=${encodeURIComponent(JSON.stringify(config || {}))}`);
+      } else {
+        eventWindow.loadFile(path.join(__dirname, 'index.html'), {
+          query: { eventWindow: windowId, config: JSON.stringify(config || {}) }
+        });
+      }
+
+      return { success: true, windowId };
+    } catch (error) {
+      console.error('Failed to create event window:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  console.log('🔧 Registering eventWindow:close handler...');
+  ipcMain.handle('eventWindow:close', async (_event, windowId: string) => {
+    try {
+      const window = eventWindows.get(windowId);
+      if (window && !window.isDestroyed()) {
+        window.close();
+        return { success: true };
+      }
+      return { success: false, error: 'Window not found or already closed' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  console.log('🔧 Registering eventWindow:list handler...');
+  ipcMain.handle('eventWindow:list', async () => {
+    const activeWindows: string[] = [];
+    for (const [windowId, window] of eventWindows.entries()) {
+      if (!window.isDestroyed()) {
+        activeWindows.push(windowId);
+      } else {
+        eventWindows.delete(windowId);
+      }
+    }
+    return activeWindows;
+  });
+
+  console.log('🔧 Registering eventWindow:updateTitle handler...');
+  ipcMain.handle('eventWindow:updateTitle', async (_event, windowId: string, title: string) => {
+    try {
+      const window = eventWindows.get(windowId);
+      if (window && !window.isDestroyed()) {
+        window.setTitle(title);
+        return { success: true };
+      }
+      return { success: false, error: 'Window not found or already closed' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   // Register IPC handler to open a local file
   ipcMain.handle('open-local-file', async (_event, relativePath: string) => {
     try {
@@ -387,8 +596,14 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Listen to chatBus and enqueue chat messages for TTS
-  chatBus.onChatMessage((event) => {
+  // Listen to eventBus and enqueue chat messages for TTS (filter for chat events only)
+  eventBus.onEventType('chat', (event) => {
+    // Skip if no message (shouldn't happen for chat events, but type safety)
+    if (!event.message) return;
+    
+    // Type-safe access to message
+    const messageText = event.message;
+
     // --- Upsert viewer on every chat message ---
     // Generate a unique viewer id as a hash of platform and user id
     const platformUserId = event.tags?.['user-id'] || event.user;
@@ -421,7 +636,7 @@ app.whenReady().then(async () => {
           }
         }
         if (ttsDisabled) return; // Do not enqueue if TTS is disabled for this user
-        let ttsText = event.message;
+        let ttsText = messageText;
         if (ttsSettings.readNameBeforeMessage && event.user) {
           let namePart = event.user;
           if (ttsSettings.includePlatformWithName && event.platform) {
@@ -436,6 +651,10 @@ app.whenReady().then(async () => {
         // Apply repeated char filter
         if (typeof ttsSettings.maxRepeatedChars === 'number' && ttsSettings.maxRepeatedChars > 0) {
           ttsText = filterRepeatedChars(ttsText, ttsSettings.maxRepeatedChars);
+        }
+        // Apply repeated emoji filter
+        if (typeof ttsSettings.maxRepeatedEmojis === 'number' && ttsSettings.maxRepeatedEmojis > 0) {
+          ttsText = filterRepeatedEmojis(ttsText, ttsSettings.maxRepeatedEmojis);
         }
         // Apply large number filter
         if (typeof ttsSettings.skipLargeNumbers === 'boolean' && ttsSettings.skipLargeNumbers) {
@@ -458,6 +677,27 @@ app.whenReady().then(async () => {
       // Use backend formatting for live messages
       const { formatChatMessage } = require('./backend/services/chatFormatting');
       win.webContents.send('chat:live', formatChatMessage(event));
+    }
+  });
+
+  // --- Forward all events from eventBus to renderer for Events screen ---
+  eventBus.onEvent((event: any) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && win.webContents) {
+      console.log('Forwarding event to renderer:', event.type, event.user); // Debug log
+      win.webContents.send('events:live', event);
+    } else {
+      console.log('No window available to forward event to'); // Debug log
+    }
+
+    // Also forward to all event windows
+    for (const [windowId, eventWindow] of eventWindows.entries()) {
+      if (!eventWindow.isDestroyed() && eventWindow.webContents) {
+        eventWindow.webContents.send('events:live', event);
+      } else {
+        // Clean up destroyed window reference
+        eventWindows.delete(windowId);
+      }
     }
   });
 
@@ -513,3 +753,16 @@ if (process.env.NODE_ENV !== 'test') {
   // Remove this line, as we now use overlayServer for OBS endpoints
   // registerObsOverlayEndpoints(app); // <-- Remove this line
 }
+
+// Add global error handling
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // In production, you might want to show a user-friendly error dialog
+  if (!isDev) {
+    console.error('Stack trace:', error.stack);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});

@@ -2,6 +2,7 @@ import path from 'path';
 import { app } from 'electron';
 import sqlite3 from 'sqlite3';
 import { chatBus, ChatMessageEvent } from '../services/chatBus';
+import { eventBus, StreamEvent } from '../services/eventBus';
 
 // Determine the path for the SQLite database file in the user's app data directory
 const dbPath = path.join(app.getPath('userData'), 'StreamMesh.sqlite');
@@ -24,6 +25,20 @@ export function initDatabase() {
     platform TEXT,
     time TEXT,
     text TEXT
+  )`);
+
+  // New events table for unified event system
+  db.run(`CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    channel TEXT,
+    user TEXT NOT NULL,
+    data TEXT,
+    message TEXT,
+    amount INTEGER,
+    metadata TEXT,
+    time TEXT NOT NULL
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS viewers (
@@ -71,6 +86,137 @@ export function deleteAllChatMessages(cb: (err: Error | null) => void) {
 // Delete a single chat message by id
 export function deleteChatMessageById(id: number, cb: (err: Error | null) => void) {
   db.run('DELETE FROM chat_messages WHERE id = ?', [id], cb);
+}
+
+// Event functions - for the new unified event system
+export function insertEvent(event: StreamEvent, cb: (err: Error | null) => void) {
+  db.run(
+    `INSERT INTO events (type, platform, channel, user, data, message, amount, metadata, time) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      event.type,
+      event.platform,
+      event.channel,
+      event.user,
+      event.data ? JSON.stringify(event.data) : null,
+      event.message || null,
+      event.amount || null,
+      event.tags ? JSON.stringify(event.tags) : null,
+      event.time,
+    ],
+    cb
+  );
+}
+
+// Fetch events with optional filters
+export function fetchEvents(
+  filters: {
+    type?: string;
+    platform?: string;
+    user?: string;
+    startTime?: string;
+    endTime?: string;
+    limit?: number;
+    offset?: number;
+  },
+  cb: (err: Error | null, rows?: any[]) => void
+) {
+  let query = 'SELECT * FROM events WHERE 1=1';
+  const params: any[] = [];
+
+  if (filters.type) {
+    query += ' AND type = ?';
+    params.push(filters.type);
+  }
+  if (filters.platform) {
+    query += ' AND platform = ?';
+    params.push(filters.platform);
+  }
+  if (filters.user) {
+    query += ' AND user = ?';
+    params.push(filters.user);
+  }
+  if (filters.startTime) {
+    query += ' AND time >= ?';
+    params.push(filters.startTime);
+  }
+  if (filters.endTime) {
+    query += ' AND time <= ?';
+    params.push(filters.endTime);
+  }
+
+  query += ' ORDER BY time DESC';
+
+  if (filters.limit) {
+    query += ' LIMIT ?';
+    params.push(filters.limit);
+    if (filters.offset) {
+      query += ' OFFSET ?';
+      params.push(filters.offset);
+    }
+  }
+
+  db.all(query, params, cb);
+}
+
+// Delete events by id
+export function deleteEventById(id: number, cb: (err: Error | null) => void) {
+  db.run('DELETE FROM events WHERE id = ?', [id], cb);
+}
+
+// Delete events by type
+export function deleteEventsByType(type: string, cb: (err: Error | null) => void) {
+  db.run('DELETE FROM events WHERE type = ?', [type], cb);
+}
+
+// Delete events older than specified date
+export function deleteEventsOlderThan(date: string, cb: (err: Error | null) => void) {
+  db.run('DELETE FROM events WHERE time < ?', [date], cb);
+}
+
+// Delete all events
+export function deleteAllEvents(cb: (err: Error | null) => void) {
+  db.run('DELETE FROM events', cb);
+}
+
+// Count events for pagination
+export function countEvents(
+  filters: {
+    type?: string;
+    platform?: string;
+    user?: string;
+    startTime?: string;
+    endTime?: string;
+  },
+  cb: (err: Error | null, count?: number) => void
+) {
+  let query = 'SELECT COUNT(*) as count FROM events WHERE 1=1';
+  const params: any[] = [];
+
+  if (filters.type) {
+    query += ' AND type = ?';
+    params.push(filters.type);
+  }
+  if (filters.platform) {
+    query += ' AND platform = ?';
+    params.push(filters.platform);
+  }
+  if (filters.user) {
+    query += ' AND user = ?';
+    params.push(filters.user);
+  }
+  if (filters.startTime) {
+    query += ' AND time >= ?';
+    params.push(filters.startTime);
+  }
+  if (filters.endTime) {
+    query += ' AND time <= ?';
+    params.push(filters.endTime);
+  }
+
+  db.get(query, params, (err, row: any) => {
+    cb(err, row ? row.count : 0);
+  });
 }
 
 // Ensure default settings for a viewer
@@ -144,7 +290,7 @@ export function upsertViewerSetting({ viewer_id, key, value }: { viewer_id: stri
   );
 }
 
-// Register a listener for chat messages from the chatBus
+// Register a listener for chat messages from the chatBus (backward compatibility)
 export function registerChatBusDbListener() {
   chatBus.onChatMessage((event: ChatMessageEvent) => {
     // Use a 12-character truncated SHA-256 hash for viewer ID (safe, compact, and unique for this use case)
@@ -169,5 +315,46 @@ export function registerChatBusDbListener() {
         console.error('Failed to insert chat message:', err);
       }
     });
+  });
+}
+
+// Register a listener for all events from the new eventBus (dual-write system)
+export function registerEventBusDbListener() {
+  eventBus.onEvent((event: StreamEvent) => {
+    // Use a 12-character truncated SHA-256 hash for viewer ID (safe, compact, and unique for this use case)
+    const platformUserId = event.tags?.['user-id'] || event.user;
+    const platform = event.platform;
+    const viewerKey = require('crypto').createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
+    
+    // Update viewer information
+    upsertViewer({
+      id: viewerKey,
+      name: event.user,
+      platform: event.platform,
+      platform_key: platformUserId,
+      last_active_time: event.time,
+    });
+    
+    // Insert event into events table
+    insertEvent(event, (err) => {
+      if (err) {
+        console.error('Failed to insert event:', err);
+      }
+    });
+    
+    // For backward compatibility, also insert chat messages into the old chat_messages table
+    if (event.type === 'chat' && event.message) {
+      insertChatMessage({
+        user: event.user,
+        user_id: event.tags?.['user-id'] || '',
+        platform: event.platform,
+        time: event.time,
+        text: event.message,
+      }, (err) => {
+        if (err) {
+          console.error('Failed to insert chat message (backward compatibility):', err);
+        }
+      });
+    }
   });
 }
