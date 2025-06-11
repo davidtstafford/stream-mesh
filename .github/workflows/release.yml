@@ -15,7 +15,16 @@ jobs:
     
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-13  # Intel runner for x64 builds
+            arch: x64
+            platform: macOS-Intel
+          - os: macos-latest  # ARM64 runner for ARM64 builds
+            arch: arm64
+            platform: macOS-AppleSilicon
+          - os: windows-latest
+            arch: x64
+            platform: Windows
         
     steps:
     - name: Checkout code
@@ -29,52 +38,32 @@ jobs:
     - name: Install dependencies
       run: npm ci --ignore-scripts
       
-    - name: Install Electron rebuild dependencies (macOS)
-      if: matrix.os == 'macos-latest'
+    - name: Install Electron rebuild dependencies
       run: |
         # Run electron-rebuild manually with proper error handling
-        npx electron-rebuild || echo "Warning: electron-rebuild failed, continuing anyway"
-        
-    - name: Install Electron rebuild dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        # Run electron-rebuild manually with proper error handling
-        npx electron-rebuild || echo "Warning: electron-rebuild failed, continuing anyway"
+        npx electron-rebuild --arch=${{ matrix.arch }} || echo "Warning: electron-rebuild failed, continuing anyway"
       
     - name: Build application
       run: npm run build
       
-    - name: Build distribution (macOS)
-      if: matrix.os == 'macos-latest'
-      run: npm run dist:mac
+    - name: Build distribution
+      run: |
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          npm run dist:mac -- --${{ matrix.arch }}
+        else
+          npm run dist:win
+        fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CI: true
         DEBUG: electron-builder
         
-    - name: Build distribution (Windows)
-      if: matrix.os == 'windows-latest'
-      run: npm run dist:win
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CI: true
-        DEBUG: electron-builder
-        
-    - name: Upload macOS artifacts
-      if: matrix.os == 'macos-latest'
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: macos-dist
+        name: ${{ matrix.platform }}-dist
         path: |
           release/*.dmg
-        retention-days: 7
-        
-    - name: Upload Windows artifacts
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-dist
-        path: |
           release/*.exe
         retention-days: 7
 
@@ -94,16 +83,22 @@ jobs:
       id: package-version
       run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
       
-    - name: Download macOS artifacts
+    - name: Download macOS Intel artifacts
       uses: actions/download-artifact@v4
       with:
-        name: macos-dist
+        name: macOS-Intel-dist
+        path: ./dist-artifacts/
+        
+    - name: Download macOS Apple Silicon artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: macOS-AppleSilicon-dist
         path: ./dist-artifacts/
         
     - name: Download Windows artifacts
       uses: actions/download-artifact@v4
       with:
-        name: windows-dist
+        name: Windows-dist
         path: ./dist-artifacts/
         
     - name: List downloaded artifacts

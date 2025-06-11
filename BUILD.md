@@ -3,7 +3,7 @@
 ## Prerequisites
 
 ### For All Platforms
-- Node.js 18+ and npm
+- Node.js 22+ and npm (Node.js 18+ also supported but 22+ recommended for CI)
 - Git
 
 ### For macOS Builds
@@ -36,6 +36,15 @@ npm run dist:all
 #### Build for macOS Only
 ```bash
 npm run dist:mac
+```
+
+#### Build for macOS (specific architecture)
+```bash
+# Intel Mac (x64)
+npm run dist:mac -- --x64
+
+# Apple Silicon Mac (arm64)
+npm run dist:mac -- --arm64
 ```
 
 #### Build for Windows Only
@@ -100,6 +109,25 @@ If you encounter issues with native dependencies (like sqlite3):
 ```bash
 npm run electron-rebuild
 ```
+
+### Architecture Mismatch Issues
+If you get `incompatible architecture` errors (e.g., `have 'arm64', need 'x86_64'`):
+
+**For Intel Macs:**
+```bash
+# Force rebuild for x64 architecture
+npx electron-rebuild --arch=x64
+npm run dist:mac -- --x64
+```
+
+**For Apple Silicon Macs:**
+```bash
+# Force rebuild for arm64 architecture  
+npx electron-rebuild --arch=arm64
+npm run dist:mac -- --arm64
+```
+
+**Note:** GitHub Actions automatically builds both architectures using dedicated Intel and ARM64 runners.
 
 ### Cross-Platform Building
 - Building for Windows from macOS requires Wine: `brew install wine`
