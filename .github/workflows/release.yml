@@ -62,7 +62,14 @@ jobs:
       
     - name: Build macOS distribution
       if: startsWith(matrix.platform, 'macos')
-      run: npm run dist:mac -- --${{ matrix.arch }}
+      run: |
+        if [ "${{ matrix.platform }}" = "macos-intel" ]; then
+          echo "Building Intel DMG only..."
+          npm run dist:mac -- --config.mac.target='[{"target":"dmg","arch":["x64"]}]'
+        else
+          echo "Building ARM64 DMG only..."
+          npm run dist:mac -- --config.mac.target='[{"target":"dmg","arch":["arm64"]}]'
+        fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
@@ -90,6 +97,24 @@ jobs:
           file "node_modules/sqlite3/build/Release/node_sqlite3.node"
           lipo -info "node_modules/sqlite3/build/Release/node_sqlite3.node" || echo "Not a fat binary"
         fi
+        
+        # Check the DMG directly
+        echo "Checking sqlite3 in final DMG..."
+        for dmg in release/*.dmg; do
+          if [ -f "$dmg" ]; then
+            echo "=== Checking $dmg ==="
+            hdiutil attach "$dmg" -readonly -mountpoint /tmp/dmg_check || continue
+            if [ -f "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node" ]; then
+              echo "sqlite3 architecture in DMG:"
+              file "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node"
+              lipo -info "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node" || echo "Not a fat binary"
+            else
+              echo "sqlite3 not found in DMG"
+            fi
+            hdiutil detach /tmp/dmg_check || true
+            echo ""
+          fi
+        done
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -134,27 +159,13 @@ jobs:
         name: windows-build
         path: ./artifacts/
         
-    - name: List and verify all downloaded artifacts
+    - name: List downloaded artifacts
       run: |
         echo "All downloaded artifacts:"
         ls -la ./artifacts/
         echo ""
-        echo "Checking architecture of each DMG:"
-        for dmg in ./artifacts/*.dmg; do
-          if [ -f "$dmg" ]; then
-            echo "=== $dmg ==="
-            # Mount the DMG temporarily to check sqlite3
-            hdiutil attach "$dmg" -readonly -mountpoint /tmp/dmg_check || continue
-            if [ -f "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node" ]; then
-              echo "sqlite3 architecture in $dmg:"
-              file "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node"
-            else
-              echo "sqlite3 not found in $dmg"
-            fi
-            hdiutil detach /tmp/dmg_check || true
-            echo ""
-          fi
-        done
+        echo "DMG files collected:"
+        ls -la ./artifacts/*.dmg || echo "No DMG files found"
         
     - name: Create Release
       env:
