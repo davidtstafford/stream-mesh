@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-intel:
+    runs-on: macos-13  # Intel Mac
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - run: npm ci
+    - run: npm run build
+    - run: npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: intel-dmg
+        path: release/*.dmg
+
+  build-arm:
+    runs-on: macos-latest  # ARM Mac
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - run: npm ci
+    - run: npm run build
+    - run: npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: arm-dmg
+        path: release/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - run: npm ci
+    - run: npm run build
+    - run: npm run dist:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows-exe
+        path: release/*.exe
+
+  release:
+    needs: [build-intel, build-arm, build-windows]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+    - uses: actions/download-artifact@v4
+      with:
+        name: intel-dmg
+        path: ./release/
+    - uses: actions/download-artifact@v4
+      with:
+        name: arm-dmg
+        path: ./release/
+    - uses: actions/download-artifact@v4
+      with:
+        name: windows-exe
+        path: ./release/
+    - run: ls -la ./release/
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ steps.version.outputs.version }}" \
+          --title "Stream Mesh v${{ steps.version.outputs.version }}" \
+          --notes "Automated release" \
+          ./release/*
