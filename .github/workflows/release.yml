@@ -134,6 +134,28 @@ jobs:
         name: windows-build
         path: ./artifacts/
         
+    - name: List and verify all downloaded artifacts
+      run: |
+        echo "All downloaded artifacts:"
+        ls -la ./artifacts/
+        echo ""
+        echo "Checking architecture of each DMG:"
+        for dmg in ./artifacts/*.dmg; do
+          if [ -f "$dmg" ]; then
+            echo "=== $dmg ==="
+            # Mount the DMG temporarily to check sqlite3
+            hdiutil attach "$dmg" -readonly -mountpoint /tmp/dmg_check || continue
+            if [ -f "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node" ]; then
+              echo "sqlite3 architecture in $dmg:"
+              file "/tmp/dmg_check/Stream Mesh.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node"
+            else
+              echo "sqlite3 not found in $dmg"
+            fi
+            hdiutil detach /tmp/dmg_check || true
+            echo ""
+          fi
+        done
+        
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
