@@ -107,7 +107,10 @@ function loadCommandSettings(): CommandSettings {
   } catch {
     // Default: all commands enabled at viewer level with TTS off
     return {
-      '~hello': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false }
+      '~hello': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~voices': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~setvoice': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~myvoice': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false }
     };
   }
 }

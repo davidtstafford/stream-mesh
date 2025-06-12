@@ -3,6 +3,10 @@ import { EventEmitter } from 'events';
 import { platformIntegrationService } from './platformIntegration';
 import { eventBus, StreamEvent } from './eventBus';
 import { fetchViewerSettings } from '../core/database';
+import pollyVoiceEngines from '../../shared/assets/pollyVoiceEngines.sorted.json';
+import fs from 'fs';
+import path from 'path';
+import { app } from 'electron';
 
 // Permission levels for commands
 export type PermissionLevel = 'viewer' | 'moderator' | 'super_moderator';
@@ -48,6 +52,193 @@ class CommandProcessor extends EventEmitter {
     };
 
     this.systemCommands.set('~hello', helloCommand);
+
+    // ~voices command
+    const voicesCommand: SystemCommand = {
+      command: '~voices',
+      enabled: true,
+      description: 'Shows link to complete TTS voices list and neural voice status',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          // Load TTS settings to check if neural voices are disabled
+          let disableNeuralVoices = false;
+          try {
+            const userDataPath = app.getPath('userData');
+            const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+            if (fs.existsSync(ttsSettingsPath)) {
+              const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+              disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+            }
+          } catch {}
+
+          // Simple response with link and neural voice status
+          const neuralStatus = disableNeuralVoices ? 'Neural voices are DISABLED' : 'Neural voices are ENABLED';
+          const response = `@${event.user} View all 94 available TTS voices here: https://stream-mesh-website.web.app/voices.html • ${neuralStatus}`;
+
+          await this.sendCommandResponse(response, '~voices');
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~voices command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to retrieve voice information.`,
+            '~voices'
+          );
+        }
+      }
+    };
+
+    this.systemCommands.set('~voices', voicesCommand);
+
+    // ~setvoice command
+    const setvoiceCommand: SystemCommand = {
+      command: '~setvoice',
+      enabled: true,
+      description: 'Set your personal TTS voice (use ~setvoice [voice_name])',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          // Parse command arguments
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~setvoice part
+          const voiceName = args[0];
+
+          if (!voiceName) {
+            await this.sendCommandResponse(
+              `@${event.user} Please specify a voice name. Use ~voices to see available voices. Example: ~setvoice Joanna`,
+              '~setvoice'
+            );
+            return;
+          }
+
+          // Load TTS settings to check if neural voices are disabled
+          let disableNeuralVoices = false;
+          try {
+            const userDataPath = app.getPath('userData');
+            const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+            if (fs.existsSync(ttsSettingsPath)) {
+              const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+              disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+            }
+          } catch {}
+
+          // Get all voices and filter if neural voices are disabled
+          let allVoices = pollyVoiceEngines as any[];
+          if (disableNeuralVoices) {
+            allVoices = allVoices.filter(v => v.Engines.includes('standard'));
+          }
+
+          // Find the requested voice (case insensitive)
+          const foundVoice = allVoices.find(v => 
+            v.Name.toLowerCase() === voiceName.toLowerCase()
+          );
+
+          if (!foundVoice) {
+            await this.sendCommandResponse(
+              `@${event.user} Voice "${voiceName}" not found. Use ~voices to see available voices.`,
+              '~setvoice'
+            );
+            return;
+          }
+
+          // Get user ID for database lookup
+          const platformUserId = event.tags?.['user-id'] || event.user;
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
+
+          // Save voice setting to database
+          const { upsertViewerSetting } = require('../core/database');
+          await new Promise<void>((resolve, reject) => {
+            upsertViewerSetting(
+              { viewer_id: viewerKey, key: 'voice', value: foundVoice.Name },
+              (err: Error | null) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+
+          await this.sendCommandResponse(
+            `@${event.user} Your TTS voice has been set to ${foundVoice.Name} (${foundVoice.LanguageName}). Your next message will use this voice!`,
+            '~setvoice'
+          );
+          
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~setvoice command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to set your voice. Please try again.`,
+            '~setvoice'
+          );
+        }
+      }
+    };
+
+    this.systemCommands.set('~setvoice', setvoiceCommand);
+
+    // ~myvoice command
+    const myvoiceCommand: SystemCommand = {
+      command: '~myvoice',
+      enabled: true,
+      description: 'Show your current TTS voice setting',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          // Get user ID for database lookup
+          const platformUserId = event.tags?.['user-id'] || event.user;
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${platformUserId}`).digest('hex').slice(0, 12);
+
+          // Fetch user's voice setting from database
+          const { fetchViewerSettings } = require('../core/database');
+          const settings = await new Promise<any[]>((resolve, reject) => {
+            fetchViewerSettings(viewerKey, (err: Error | null, rows?: any[]) => {
+              if (err) reject(err);
+              else resolve(rows || []);
+            });
+          });
+
+          const voiceSetting = settings.find(s => s.key === 'voice');
+          const currentVoice = voiceSetting?.value;
+
+          if (!currentVoice || currentVoice === '') {
+            await this.sendCommandResponse(
+              `@${event.user} You haven't set a custom TTS voice yet. Using default voice. Use ~setvoice [name] to set your voice (see ~voices for options).`,
+              '~myvoice'
+            );
+            return;
+          }
+
+          // Find voice details
+          const allVoices = pollyVoiceEngines as any[];
+          const voiceDetails = allVoices.find(v => v.Name === currentVoice);
+
+          if (voiceDetails) {
+            await this.sendCommandResponse(
+              `@${event.user} Your TTS voice is set to ${voiceDetails.Name} (${voiceDetails.LanguageName}). Use ~setvoice [name] to change it.`,
+              '~myvoice'
+            );
+          } else {
+            await this.sendCommandResponse(
+              `@${event.user} Your TTS voice is set to ${currentVoice}, but this voice is no longer available. Use ~setvoice [name] to update it.`,
+              '~myvoice'
+            );
+          }
+          
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~myvoice command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to retrieve your voice setting.`,
+            '~myvoice'
+          );
+        }
+      }
+    };
+
+    this.systemCommands.set('~myvoice', myvoiceCommand);
   }
 
   private loadSettings(settings: Record<string, { enabled: boolean }>) {
