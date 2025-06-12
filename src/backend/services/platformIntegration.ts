@@ -196,7 +196,7 @@ class PlatformIntegrationService extends EventEmitter {
   }
 
   // Send a chat message to the connected platform
-  async sendChatMessage(message: string, platform: Platform = 'twitch'): Promise<void> {
+  async sendChatMessage(message: string, platform: Platform = 'twitch', skipTTS: boolean = true): Promise<void> {
     if (platform === 'twitch') {
       if (!this.connections.twitch.connected || !this.twitchClient) {
         throw new Error('Not connected to Twitch');
@@ -215,7 +215,8 @@ class PlatformIntegrationService extends EventEmitter {
         message,
         tags: {
           'user-id': 'bot',
-          'display-name': this.connections.twitch.username
+          'display-name': this.connections.twitch.username,
+          'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
         },
         time: new Date().toISOString(),
       };

@@ -5,6 +5,7 @@ interface SystemCommand {
   enabled: boolean;
   description: string;
   permissionLevel: 'viewer' | 'moderator' | 'super_moderator';
+  enableTTSReply: boolean;
   // Note: handler function is not included as it's not serializable for IPC
 }
 
@@ -84,6 +85,26 @@ const SystemCommands: React.FC = () => {
     } catch (error) {
       console.error('Failed to change permission level:', error);
       setError(`Failed to change permission level for ${command}. Please try again.`);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const toggleTTSReply = async (command: string, enableTTSReply: boolean) => {
+    setSaving(command);
+    setError(null);
+    try {
+      await window.electron.ipcRenderer.invoke('commands:setTTSReply', command, enableTTSReply);
+      
+      // Update local state
+      setCommands(prev => prev.map(cmd => 
+        cmd.command === command ? { ...cmd, enableTTSReply } : cmd
+      ));
+      
+      setSuccessMessage(`${command} TTS reply ${enableTTSReply ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Failed to toggle TTS reply:', error);
+      setError(`Failed to toggle TTS reply for ${command}. Please try again.`);
     } finally {
       setSaving(null);
     }
@@ -209,6 +230,16 @@ const SystemCommands: React.FC = () => {
                 borderBottom: '1px solid #444',
                 width: '120px'
               }}>
+                TTS Reply
+              </th>
+              <th style={{ 
+                padding: '16px', 
+                textAlign: 'center', 
+                color: '#fff', 
+                fontWeight: 'bold',
+                borderBottom: '1px solid #444',
+                width: '120px'
+              }}>
                 Enabled
               </th>
             </tr>
@@ -266,6 +297,30 @@ const SystemCommands: React.FC = () => {
                   }}>
                     <input 
                       type="checkbox" 
+                      checked={command.enableTTSReply}
+                      disabled={saving === command.command}
+                      onChange={(e) => toggleTTSReply(command.command, e.target.checked)}
+                      style={{ cursor: 'inherit' }}
+                    />
+                    <span style={{ fontSize: '12px', color: '#aaa' }}>
+                      {command.enableTTSReply ? '🔊' : '🔇'}
+                    </span>
+                    {saving === command.command && (
+                      <span style={{ fontSize: '12px', color: '#aaa' }}>Saving...</span>
+                    )}
+                  </label>
+                </td>
+                <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: saving === command.command ? 'not-allowed' : 'pointer',
+                    opacity: saving === command.command ? 0.6 : 1
+                  }}>
+                    <input 
+                      type="checkbox" 
                       checked={command.enabled}
                       disabled={saving === command.command}
                       onChange={(e) => toggleCommand(command.command, e.target.checked)}
@@ -299,6 +354,9 @@ const SystemCommands: React.FC = () => {
           <li style={{ marginLeft: 20 }}>👤 <strong>Viewer:</strong> Anyone can use the command</li>
           <li style={{ marginLeft: 20 }}>🛡️ <strong>Moderator:</strong> Only moderators and super moderators can use</li>
           <li style={{ marginLeft: 20 }}>⭐ <strong>Super Moderator:</strong> Only super moderators can use</li>
+          <li><strong>TTS Reply:</strong> Controls whether command responses are read aloud by Text-to-Speech</li>
+          <li style={{ marginLeft: 20 }}>🔊 When enabled, bot responses will be read by TTS</li>
+          <li style={{ marginLeft: 20 }}>🔇 When disabled, responses are sent silently to prevent TTS spam</li>
           <li>User roles can be managed in the Viewers screen</li>
           <li>Changes take effect immediately</li>
         </ul>

@@ -12,6 +12,7 @@ export interface SystemCommand {
   enabled: boolean;
   description: string;
   permissionLevel: PermissionLevel;
+  enableTTSReply: boolean; // New: whether command responses should be read by TTS
   handler: (event: StreamEvent) => Promise<void>;
 }
 
@@ -36,9 +37,13 @@ class CommandProcessor extends EventEmitter {
       enabled: true, // Default enabled, will be overridden by settings
       description: 'Replies with a hello message to the user',
       permissionLevel: 'viewer', // Default to viewer level
+      enableTTSReply: false, // Don't read bot responses by default
       handler: async (event: StreamEvent) => {
         const response = `Hello ${event.user}! 👋`;
-        await platformIntegrationService.sendChatMessage(response);
+        // Check if TTS is enabled for this command
+        const systemCommand = this.systemCommands.get('~hello');
+        const skipTTS = systemCommand ? !systemCommand.enableTTSReply : true;
+        await platformIntegrationService.sendChatMessage(response, 'twitch', skipTTS);
       }
     };
 
@@ -110,9 +115,11 @@ class CommandProcessor extends EventEmitter {
           
           if (!hasPermission) {
             console.log(`[CommandProcessor] User ${event.user} lacks permission for command: ${command} (requires ${systemCommand.permissionLevel})`);
-            // Optionally send a message back to chat about insufficient permissions
+            // Send permission denied message (never read by TTS)
             await platformIntegrationService.sendChatMessage(
-              `@${event.user} You don't have permission to use that command. (Requires ${systemCommand.permissionLevel} or higher)`
+              `@${event.user} You don't have permission to use that command. (Requires ${systemCommand.permissionLevel} or higher)`,
+              'twitch',
+              true // Always skip TTS for permission denied messages
             );
             return;
           }
@@ -128,13 +135,21 @@ class CommandProcessor extends EventEmitter {
     });
   }
 
+  // Custom sendChatMessage that respects TTS settings
+  async sendCommandResponse(message: string, command: string): Promise<void> {
+    const systemCommand = this.systemCommands.get(command);
+    const skipTTS = systemCommand ? !systemCommand.enableTTSReply : true;
+    await platformIntegrationService.sendChatMessage(message, 'twitch', skipTTS);
+  }
+
   // Get all system commands for UI (without the handler functions)
   getSystemCommands(): Omit<SystemCommand, 'handler'>[] {
     return Array.from(this.systemCommands.values()).map(cmd => ({
       command: cmd.command,
       enabled: cmd.enabled,
       description: cmd.description,
-      permissionLevel: cmd.permissionLevel
+      permissionLevel: cmd.permissionLevel,
+      enableTTSReply: cmd.enableTTSReply
     }));
   }
 
@@ -168,6 +183,22 @@ class CommandProcessor extends EventEmitter {
   getCommandPermissionLevel(command: string): PermissionLevel | null {
     const systemCommand = this.systemCommands.get(command);
     return systemCommand ? systemCommand.permissionLevel : null;
+  }
+
+  // Set command TTS reply setting
+  setCommandTTSReply(command: string, enableTTSReply: boolean): void {
+    const systemCommand = this.systemCommands.get(command);
+    if (systemCommand) {
+      systemCommand.enableTTSReply = enableTTSReply;
+      console.log(`[CommandProcessor] Command ${command} TTS reply ${enableTTSReply ? 'enabled' : 'disabled'}`);
+      this.emit('commandTTSReplyChanged', { command, enableTTSReply });
+    }
+  }
+
+  // Get command TTS reply setting
+  getCommandTTSReply(command: string): boolean | null {
+    const systemCommand = this.systemCommands.get(command);
+    return systemCommand ? systemCommand.enableTTSReply : null;
   }
 }
 

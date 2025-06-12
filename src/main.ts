@@ -91,11 +91,12 @@ function saveEventConfig(configs: Record<string, any>) {
   fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
 }
 
-// Command settings (for system commands enable/disable and permissions)
+// Command settings (for system commands enable/disable, permissions, and TTS)
 interface CommandSettings {
   [command: string]: {
     enabled: boolean;
     permissionLevel?: 'viewer' | 'moderator' | 'super_moderator';
+    enableTTSReply?: boolean;
   };
 }
 
@@ -104,9 +105,9 @@ function loadCommandSettings(): CommandSettings {
     const data = fs.readFileSync(commandSettingsFilePath, 'utf-8');
     return JSON.parse(data);
   } catch {
-    // Default: all commands enabled at viewer level
+    // Default: all commands enabled at viewer level with TTS off
     return {
-      '~hello': { enabled: true, permissionLevel: 'viewer' }
+      '~hello': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false }
     };
   }
 }
@@ -203,6 +204,9 @@ app.whenReady().then(async () => {
     commandProcessor.setCommandEnabled(command, config.enabled);
     if (config.permissionLevel) {
       commandProcessor.setCommandPermissionLevel(command, config.permissionLevel);
+    }
+    if (config.enableTTSReply !== undefined) {
+      commandProcessor.setCommandTTSReply(command, config.enableTTSReply);
     }
   });
   
@@ -465,6 +469,21 @@ app.whenReady().then(async () => {
     
     return true;
   });
+
+  ipcMain.handle('commands:setTTSReply', async (_event, command: string, enableTTSReply: boolean) => {
+    commandProcessor.setCommandTTSReply(command, enableTTSReply);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled: true, enableTTSReply };
+    } else {
+      currentSettings[command].enableTTSReply = enableTTSReply;
+    }
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
   
   ipcMain.handle('commands:getSettings', async () => {
     return loadCommandSettings();
@@ -694,6 +713,12 @@ app.whenReady().then(async () => {
   eventBus.onEventType('chat', (event) => {
     // Skip if no message (shouldn't happen for chat events, but type safety)
     if (!event.message) return;
+    
+    // Skip bot messages to prevent TTS spam
+    if (event.tags?.['is-bot-message'] === 'true') {
+      console.log('[TTS] Skipping bot message:', event.message);
+      return;
+    }
     
     // Type-safe access to message
     const messageText = event.message;
