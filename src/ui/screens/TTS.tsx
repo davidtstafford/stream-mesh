@@ -7,6 +7,7 @@ import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
 import TTSTestAllVoicesSection from './TTS/TTSTestAllVoicesSection';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import pollyVoiceEngines from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
 // PollyConfig type (copy from backend)
@@ -38,6 +39,7 @@ const TTS: React.FC = () => {
   const [voices, setVoices] = useState<PollyVoiceSorted[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
   const [voicesLoaded, setVoicesLoaded] = useState(false);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   // Get disableNeuralVoices from TTS settings
   const { disableNeuralVoices } = useTTSSettings();
@@ -172,7 +174,7 @@ const TTS: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(600), color: '#fff' }}>
       {/* Help Modal */}
       <TTSHelpModal showHelp={showHelp} onClose={() => setShowHelp(false)} />
       

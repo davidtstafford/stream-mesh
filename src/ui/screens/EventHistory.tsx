@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface StoredEvent {
   id: number;
@@ -21,6 +22,7 @@ const EventHistory: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searching, setSearching] = useState(false);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   const eventTypes = ['chat', 'subscription', 'resub', 'subgift', 'cheer', 'hosted', 'raided'];
 
@@ -156,7 +158,7 @@ const EventHistory: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', color: 'var(--text-color, #fff)' }}>
+    <div style={{ ...getResponsiveContainerStyle(1200), color: 'var(--text-color, #fff)' }}>
       <h2 style={{ fontWeight: 'bold', marginBottom: 24 }}>Event History</h2>
 
       {/* Search Filters */}

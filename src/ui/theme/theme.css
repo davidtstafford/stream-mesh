@@ -100,6 +100,20 @@ button:active, button:focus {
   background: #e0e0e0 !important;
   color: #181c20 !important;
 }
+
+[data-theme='dark'] .active-nav {
+  background: #3a8dde !important;
+  color: #fff !important;
+}
+
+/* Navigation hover effects */
+nav div:not([style*='background: #222']):not([style*='background: #f9f9f9']):hover {
+  background: rgba(58, 141, 222, 0.1) !important;
+}
+
+[data-theme='light'] nav div:not([style*='background: #f9f9f9']):not([style*='background: #222']):hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
 [data-theme='light'] nav div[style*='background: #222'] {
   background: #f9f9f9 !important;
   color: #181c20 !important;

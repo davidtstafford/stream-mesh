@@ -195,6 +195,38 @@ class PlatformIntegrationService extends EventEmitter {
     return this.connections.twitch;
   }
 
+  // Send a chat message to the connected platform
+  async sendChatMessage(message: string, platform: Platform = 'twitch', skipTTS: boolean = true): Promise<void> {
+    if (platform === 'twitch') {
+      if (!this.connections.twitch.connected || !this.twitchClient) {
+        throw new Error('Not connected to Twitch');
+      }
+      
+      // Use tmi.js to send the message to the channel
+      const channel = this.connections.twitch.username;
+      await this.twitchClient.say(channel, message);
+      
+      // Emit a chat event for our own message so it appears in the UI
+      const chatEvent = {
+        type: 'chat' as const,
+        platform: 'twitch',
+        channel,
+        user: this.connections.twitch.username,
+        message,
+        tags: {
+          'user-id': 'bot',
+          'display-name': this.connections.twitch.username,
+          'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
+        },
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(chatEvent);
+      this.emit('chat', chatEvent);
+    } else {
+      throw new Error(`Platform ${platform} not supported for sending messages`);
+    }
+  }
+
   // Manual method to trigger channel point redemption events
   // This can be used for testing and will be replaced with EventSub integration later
   triggerChannelPointRedemption(rewardTitle: string, username: string, userInput?: string, cost?: number) {

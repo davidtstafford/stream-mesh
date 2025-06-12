@@ -36,6 +36,11 @@ const App: React.FC = () => {
   const [isEventWindow, setIsEventWindow] = useState(false);
   const [eventWindowId, setEventWindowId] = useState('');
   const [eventWindowConfig, setEventWindowConfig] = useState({});
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    // Initialize with the same logic as NavigationBar
+    const saved = localStorage.getItem('nav-collapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // Check if this is an event window based on URL parameters
   useEffect(() => {
@@ -73,8 +78,18 @@ const App: React.FC = () => {
   return (
     <ThemeProvider>
       <div style={{ display: 'flex', height: '100vh', background: '#222' }}>
-        <NavigationBar active={active} onNavigate={setActive} />
-        <main style={{ flex: 1, padding: 32, overflow: 'auto' }}>
+        <NavigationBar 
+          active={active} 
+          onNavigate={setActive}
+          onCollapseChange={setNavCollapsed}
+        />
+        <main style={{ 
+          flex: 1, 
+          padding: navCollapsed ? '32px 48px' : '32px', 
+          overflow: 'auto',
+          transition: 'padding 0.3s ease',
+          width: navCollapsed ? 'calc(100vw - 60px)' : 'calc(100vw - 240px)'
+        }}>
           {screenMap[active]}
         </main>
       </div>

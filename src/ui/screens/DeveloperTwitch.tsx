@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const DeveloperTwitch: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
   const [customData, setCustomData] = useState({
     username: 'TestUser',
     message: 'Hello from custom test!',
@@ -172,7 +174,7 @@ const DeveloperTwitch: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(900), color: '#fff' }}>
       <h2 style={{ color: '#9147ff', fontWeight: 'bold', marginBottom: 24 }}>
         🎮 Twitch Event Simulator
       </h2>

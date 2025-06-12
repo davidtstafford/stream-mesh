@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const Developer: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   const triggerEvent = async (eventType: string, eventData: any) => {
     setLoading(eventType);
@@ -131,8 +133,23 @@ const Developer: React.FC = () => {
     setLoading(null);
   };
 
+  const testCommand = async () => {
+    setLoading('command');
+    try {
+      // Simulate a ~hello command
+      await triggerEvent('chat', {
+        user: 'TestUser',
+        message: '~hello'
+      });
+      console.log('Triggered ~hello command test');
+    } catch (error) {
+      console.error('Failed to trigger command test:', error);
+    }
+    setLoading(null);
+  };
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(800), color: '#fff' }}>
       <h2 style={{ color: '#ffd700', fontWeight: 'bold', marginBottom: 24 }}>
         🛠️ Developer Tools
       </h2>
@@ -229,6 +246,24 @@ const Developer: React.FC = () => {
           >
             {loading === 'chatSpam' ? '🔄 Sending Messages...' : '💬 Simulate Chat Activity'}
           </button>
+          
+          <button
+            onClick={testCommand}
+            disabled={loading !== null}
+            style={{
+              background: loading === 'command' ? '#555' : '#28a745',
+              color: '#fff',
+              border: 'none',
+              padding: '16px 24px',
+              borderRadius: 8,
+              cursor: loading !== null ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold',
+              fontSize: 14,
+              opacity: loading !== null && loading !== 'command' ? 0.5 : 1
+            }}
+          >
+            {loading === 'command' ? '🔄 Testing Command...' : '🤖 Test ~hello Command'}
+          </button>
         </div>
       </div>
 
@@ -246,6 +281,7 @@ const Developer: React.FC = () => {
           <li>TTS will announce events if configured and enabled</li>
           <li>All events are stored in the database and visible in Event History</li>
           <li>Use Events Admin to configure which events are displayed</li>
+          <li>Command testing will simulate a user typing ~hello in chat</li>
           <li>Check the browser console for event processing logs</li>
         </ul>
       </div>

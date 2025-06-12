@@ -10,6 +10,7 @@ import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
+import { commandProcessor } from './backend/services/commandProcessor';
 
 // Use require for Node.js built-in modules and potentially problematic packages
 const fs = require('fs');
@@ -19,6 +20,7 @@ const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
+const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -87,6 +89,34 @@ function loadEventConfig(): Record<string, any> {
 
 function saveEventConfig(configs: Record<string, any>) {
   fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
+}
+
+// Command settings (for system commands enable/disable, permissions, and TTS)
+interface CommandSettings {
+  [command: string]: {
+    enabled: boolean;
+    permissionLevel?: 'viewer' | 'moderator' | 'super_moderator';
+    enableTTSReply?: boolean;
+  };
+}
+
+function loadCommandSettings(): CommandSettings {
+  try {
+    const data = fs.readFileSync(commandSettingsFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    // Default: all commands enabled at viewer level with TTS off
+    return {
+      '~hello': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~voices': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~setvoice': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false },
+      '~myvoice': { enabled: true, permissionLevel: 'viewer', enableTTSReply: false }
+    };
+  }
+}
+
+function saveCommandSettings(settings: CommandSettings) {
+  fs.writeFileSync(commandSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -169,6 +199,20 @@ app.whenReady().then(async () => {
   cleanUpTempTTSFiles();
   initDatabase();
   registerEventBusDbListener();
+  
+  // Initialize command processor with saved settings
+  const commandSettings = loadCommandSettings();
+  // Apply settings to the command processor
+  Object.entries(commandSettings).forEach(([command, config]) => {
+    commandProcessor.setCommandEnabled(command, config.enabled);
+    if (config.permissionLevel) {
+      commandProcessor.setCommandPermissionLevel(command, config.permissionLevel);
+    }
+    if (config.enableTTSReply !== undefined) {
+      commandProcessor.setCommandTTSReply(command, config.enableTTSReply);
+    }
+  });
+  
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
 
   // Auto-connect to Twitch if credentials exist
@@ -387,6 +431,78 @@ app.whenReady().then(async () => {
     return true;
   });
 
+  // Command system IPC handlers
+  ipcMain.handle('commands:getSystemCommands', async () => {
+    try {
+      const commands = commandProcessor.getSystemCommands();
+      console.log('[Main] Returning system commands:', commands);
+      return commands;
+    } catch (error) {
+      console.error('[Main] Error getting system commands:', error);
+      throw error;
+    }
+  });
+  
+  ipcMain.handle('commands:setEnabled', async (_event, command: string, enabled: boolean) => {
+    commandProcessor.setCommandEnabled(command, enabled);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled, permissionLevel: 'viewer' };
+    } else {
+      currentSettings[command].enabled = enabled;
+    }
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
+
+  ipcMain.handle('commands:setPermissionLevel', async (_event, command: string, permissionLevel: 'viewer' | 'moderator' | 'super_moderator') => {
+    commandProcessor.setCommandPermissionLevel(command, permissionLevel);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled: true, permissionLevel };
+    } else {
+      currentSettings[command].permissionLevel = permissionLevel;
+    }
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
+
+  ipcMain.handle('commands:setTTSReply', async (_event, command: string, enableTTSReply: boolean) => {
+    commandProcessor.setCommandTTSReply(command, enableTTSReply);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled: true, enableTTSReply };
+    } else {
+      currentSettings[command].enableTTSReply = enableTTSReply;
+    }
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
+  
+  ipcMain.handle('commands:getSettings', async () => {
+    return loadCommandSettings();
+  });
+
+  // Chat message sending IPC handler
+  ipcMain.handle('chat:sendMessage', async (_event, message: string) => {
+    try {
+      await platformIntegrationService.sendChatMessage(message);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to send chat message:', error);
+      throw error;
+    }
+  });
+
   ipcMain.handle('polly:speak', async (_event, { text, voiceId, engine }) => {
     return synthesizeSpeech(text, voiceId, engine);
   });
@@ -600,6 +716,12 @@ app.whenReady().then(async () => {
   eventBus.onEventType('chat', (event) => {
     // Skip if no message (shouldn't happen for chat events, but type safety)
     if (!event.message) return;
+    
+    // Skip bot messages to prevent TTS spam
+    if (event.tags?.['is-bot-message'] === 'true') {
+      console.log('[TTS] Skipping bot message:', event.message);
+      return;
+    }
     
     // Type-safe access to message
     const messageText = event.message;

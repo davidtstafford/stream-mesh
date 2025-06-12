@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import voicesJson from '../../shared/assets/pollyVoiceEngines.sorted.json';
 import { useTTSSettings } from './TTS/hooks/useTTSSettings';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 // Use the preload-exposed ipcRenderer for secure IPC
 const ipcRenderer = window.electronAPI?.ipcRenderer;
@@ -36,6 +37,7 @@ const Viewers: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [roleFilter, setRoleFilter] = useState('');
   const [ttsFilter, setTtsFilter] = useState('');
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   // Fetch viewers and settings on mount
   useEffect(() => {
@@ -159,7 +161,7 @@ const Viewers: React.FC = () => {
   }, [viewers, settings, search, roleFilter, ttsFilter]);
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(900), color: '#fff' }}>
       <h2 style={{ fontWeight: 'bold', marginBottom: 16 }}>Viewer Management</h2>
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <input

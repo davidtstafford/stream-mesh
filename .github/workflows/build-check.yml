@@ -17,66 +17,88 @@ jobs:
       id: check
       run: echo "safe=true" >> $GITHUB_OUTPUT
 
-  build-test:
+  build-intel:
     needs: security-check
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-13  # Intel Mac
     if: needs.security-check.outputs.safe-to-build == 'true'
-    
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-        
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22'
-        
     - name: Install dependencies
-      run: npm ci --ignore-scripts
-      
+      run: npm ci
     - name: Build application
       run: npm run build
-      
-    - name: Test build distribution (macOS)
-      if: matrix.os == 'macos-latest'
+    - name: Test build distribution (Intel macOS)
       run: npm run dist:mac
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Test build distribution (Windows)
-      if: matrix.os == 'windows-latest'
-      run: npm run dist:win
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Verify build artifacts (macOS)
-      if: matrix.os == 'macos-latest'
+    - name: Verify Intel DMG
       run: |
         ls -la release/
-        echo "Checking for DMG files..."
-        
-        # Check for Intel DMG (the one without -arm64 in the name)
-        if find release/ -name "Stream Mesh-*.dmg" -not -name "*-arm64.dmg" | grep -q .; then 
+        echo "Checking for Intel DMG..."
+        if find release/ -name "Stream Mesh-*.dmg" | grep -q .; then 
           echo "✅ Intel DMG found"
         else 
           echo "❌ Intel DMG missing"
+          exit 1
         fi
-        
-        # Check for ARM64 DMG
-        if find release/ -name "Stream Mesh-*-arm64.dmg" | grep -q .; then 
-          echo "✅ ARM64 DMG found"
+
+  build-arm:
+    needs: security-check
+    runs-on: macos-latest  # ARM Mac
+    if: needs.security-check.outputs.safe-to-build == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install dependencies
+      run: npm ci
+    - name: Build application
+      run: npm run build
+    - name: Test build distribution (ARM macOS)
+      run: npm run dist:mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Verify ARM DMG
+      run: |
+        ls -la release/
+        echo "Checking for ARM DMG..."
+        if find release/ -name "Stream Mesh-*.dmg" | grep -q .; then 
+          echo "✅ ARM DMG found"
         else 
-          echo "❌ ARM64 DMG missing"
+          echo "❌ ARM DMG missing"
+          exit 1
         fi
-        
-    - name: Verify build artifacts (Windows)
-      if: matrix.os == 'windows-latest'
+
+  build-windows:
+    needs: security-check
+    runs-on: windows-latest
+    if: needs.security-check.outputs.safe-to-build == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install dependencies
+      run: npm ci
+    - name: Build application
+      run: npm run build
+    - name: Test build distribution (Windows)
+      run: npm run dist:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Verify Windows EXE
       run: |
         dir release\
         echo "Checking for EXE file..."
-        if (Test-Path "release\Stream Mesh Setup*.exe") { Write-Host "✅ Windows EXE found" } else { Write-Host "❌ Windows EXE missing" }
+        if (Test-Path "release\Stream Mesh Setup*.exe") { Write-Host "✅ Windows EXE found" } else { Write-Host "❌ Windows EXE missing"; exit 1 }
       shell: powershell

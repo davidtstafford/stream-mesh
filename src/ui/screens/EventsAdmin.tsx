@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface EventConfig {
   type: string;
@@ -51,6 +52,7 @@ const EventsAdmin: React.FC = () => {
   const [windowPresets, setWindowPresets] = useState<WindowPreset[]>([]);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
   const [newPreset, setNewPreset] = useState<Partial<WindowPreset>>({
     name: '',
     eventTypes: [],

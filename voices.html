@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamMesh - Available TTS Voices</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.2);
+            margin: 20px 0;
+            padding: 15px 20px;
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat-item {
+            color: white;
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .search-container {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-select {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .voices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .voice-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+        }
+
+        .voice-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .voice-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .voice-language {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .voice-code {
+            font-size: 0.9rem;
+            color: #999;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 12px;
+        }
+
+        .engines {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .engine-tag {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .engine-neural {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+
+        .engine-standard {
+            background: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #e1bee7;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .no-results h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .footer {
+            background: #f5f5f5;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .voices-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .search-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box, .filter-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>StreamMesh TTS Voices</h1>
+            <p>Complete list of available Text-to-Speech voices powered by AWS Polly</p>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="total-voices">94</span>
+                    <span>Total Voices</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="neural-count">0</span>
+                    <span>Neural Voices</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="language-count">0</span>
+                    <span>Languages</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="search-container">
+                <input type="text" class="search-box" id="search" placeholder="Search voices by name or language...">
+                <select class="filter-select" id="language-filter">
+                    <option value="">All Languages</option>
+                </select>
+                <select class="filter-select" id="engine-filter">
+                    <option value="">All Engines</option>
+                    <option value="neural">Neural Only</option>
+                    <option value="standard">Standard Only</option>
+                </select>
+            </div>
+
+            <div class="voices-grid" id="voices-container">
+                <!-- Voices will be populated here by JavaScript -->
+            </div>
+
+            <div class="no-results" id="no-results" style="display: none;">
+                <h3>No voices found</h3>
+                <p>Try adjusting your search terms or filters</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Generated for StreamMesh • <strong>94 total voices</strong> across multiple languages and engines</p>
+        </div>
+    </div>
+
+    <script>
+        const voices = [
+            {"Name":"Nicole","LanguageName":"Australian English","LanguageCode":"en-AU","Engines":["standard"]},
+            {"Name":"Olivia","LanguageName":"Australian English","LanguageCode":"en-AU","Engines":["neural"]},
+            {"Name":"Russell","LanguageName":"Australian English","LanguageCode":"en-AU","Engines":["standard"]},
+            {"Name":"Amy","LanguageName":"British English","LanguageCode":"en-GB","Engines":["neural","standard"]},
+            {"Name":"Arthur","LanguageName":"British English","LanguageCode":"en-GB","Engines":["neural"]},
+            {"Name":"Brian","LanguageName":"British English","LanguageCode":"en-GB","Engines":["neural","standard"]},
+            {"Name":"Emma","LanguageName":"British English","LanguageCode":"en-GB","Engines":["neural","standard"]},
+            {"Name":"Aditi","LanguageName":"Indian English","LanguageCode":"en-IN","Engines":["standard"]},
+            {"Name":"Kajal","LanguageName":"Indian English","LanguageCode":"en-IN","Engines":["neural"]},
+            {"Name":"Raveena","LanguageName":"Indian English","LanguageCode":"en-IN","Engines":["standard"]},
+            {"Name":"Niamh","LanguageName":"Irish English","LanguageCode":"en-IE","Engines":["neural"]},
+            {"Name":"Aria","LanguageName":"New Zealand English","LanguageCode":"en-NZ","Engines":["neural"]},
+            {"Name":"Jasmine","LanguageName":"Singaporean English","LanguageCode":"en-SG","Engines":["neural"]},
+            {"Name":"Ayanda","LanguageName":"South African English","LanguageCode":"en-ZA","Engines":["neural"]},
+            {"Name":"Danielle","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural"]},
+            {"Name":"Gregory","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural"]},
+            {"Name":"Ivy","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Joanna","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Joey","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Justin","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Kendra","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Kevin","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural"]},
+            {"Name":"Kimberly","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Matthew","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Ruth","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural"]},
+            {"Name":"Salli","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural","standard"]},
+            {"Name":"Stephen","LanguageName":"US English","LanguageCode":"en-US","Engines":["neural"]},
+            {"Name":"Geraint","LanguageName":"Welsh English","LanguageCode":"en-GB-WLS","Engines":["standard"]},
+            {"Name":"Zeina","LanguageName":"Arabic","LanguageCode":"arb","Engines":["standard"]},
+            {"Name":"Hannah","LanguageName":"Austrian German","LanguageCode":"de-AT","Engines":["neural"]},
+            {"Name":"Lisa","LanguageName":"Belgian Dutch","LanguageCode":"nl-BE","Engines":["neural"]},
+            {"Name":"Isabelle","LanguageName":"Belgian French","LanguageCode":"fr-BE","Engines":["neural"]},
+            {"Name":"Camila","LanguageName":"Brazilian Portuguese","LanguageCode":"pt-BR","Engines":["neural","standard"]},
+            {"Name":"Ricardo","LanguageName":"Brazilian Portuguese","LanguageCode":"pt-BR","Engines":["standard"]},
+            {"Name":"Thiago","LanguageName":"Brazilian Portuguese","LanguageCode":"pt-BR","Engines":["neural"]},
+            {"Name":"Chantal","LanguageName":"Canadian French","LanguageCode":"fr-CA","Engines":["standard"]},
+            {"Name":"Gabrielle","LanguageName":"Canadian French","LanguageCode":"fr-CA","Engines":["neural"]},
+            {"Name":"Liam","LanguageName":"Canadian French","LanguageCode":"fr-CA","Engines":["neural"]},
+            {"Name":"Hiujin","LanguageName":"Cantonese","LanguageCode":"yue-CN","Engines":["neural"]},
+            {"Name":"Conchita","LanguageName":"Castilian Spanish","LanguageCode":"es-ES","Engines":["standard"]},
+            {"Name":"Enrique","LanguageName":"Castilian Spanish","LanguageCode":"es-ES","Engines":["standard"]},
+            {"Name":"Lucia","LanguageName":"Castilian Spanish","LanguageCode":"es-ES","Engines":["neural","standard"]},
+            {"Name":"Sergio","LanguageName":"Castilian Spanish","LanguageCode":"es-ES","Engines":["neural"]},
+            {"Name":"Arlet","LanguageName":"Catalan","LanguageCode":"ca-ES","Engines":["neural"]},
+            {"Name":"Zhiyu","LanguageName":"Chinese Mandarin","LanguageCode":"cmn-CN","Engines":["neural","standard"]},
+            {"Name":"Jitka","LanguageName":"Czech","LanguageCode":"cs-CZ","Engines":["neural"]},
+            {"Name":"Mads","LanguageName":"Danish","LanguageCode":"da-DK","Engines":["standard"]},
+            {"Name":"Naja","LanguageName":"Danish","LanguageCode":"da-DK","Engines":["standard"]},
+            {"Name":"Sofie","LanguageName":"Danish","LanguageCode":"da-DK","Engines":["neural"]},
+            {"Name":"Laura","LanguageName":"Dutch","LanguageCode":"nl-NL","Engines":["neural"]},
+            {"Name":"Lotte","LanguageName":"Dutch","LanguageCode":"nl-NL","Engines":["standard"]},
+            {"Name":"Ruben","LanguageName":"Dutch","LanguageCode":"nl-NL","Engines":["standard"]},
+            {"Name":"Suvi","LanguageName":"Finnish","LanguageCode":"fi-FI","Engines":["neural"]},
+            {"Name":"Mathieu","LanguageName":"French","LanguageCode":"fr-FR","Engines":["standard"]},
+            {"Name":"Daniel","LanguageName":"German","LanguageCode":"de-DE","Engines":["neural"]},
+            {"Name":"Hans","LanguageName":"German","LanguageCode":"de-DE","Engines":["standard"]},
+            {"Name":"Marlene","LanguageName":"German","LanguageCode":"de-DE","Engines":["standard"]},
+            {"Name":"Vicki","LanguageName":"German","LanguageCode":"de-DE","Engines":["neural","standard"]},
+            {"Name":"Hala","LanguageName":"Gulf Arabic","LanguageCode":"ar-AE","Engines":["neural"]},
+            {"Name":"Zayd","LanguageName":"Gulf Arabic","LanguageCode":"ar-AE","Engines":["neural"]},
+            {"Name":"Karl","LanguageName":"Icelandic","LanguageCode":"is-IS","Engines":["standard"]},
+            {"Name":"Adriano","LanguageName":"Italian","LanguageCode":"it-IT","Engines":["neural"]},
+            {"Name":"Bianca","LanguageName":"Italian","LanguageCode":"it-IT","Engines":["neural","standard"]},
+            {"Name":"Carla","LanguageName":"Italian","LanguageCode":"it-IT","Engines":["standard"]},
+            {"Name":"Giorgio","LanguageName":"Italian","LanguageCode":"it-IT","Engines":["standard"]},
+            {"Name":"Kazuha","LanguageName":"Japanese","LanguageCode":"ja-JP","Engines":["neural"]},
+            {"Name":"Mizuki","LanguageName":"Japanese","LanguageCode":"ja-JP","Engines":["standard"]},
+            {"Name":"Takumi","LanguageName":"Japanese","LanguageCode":"ja-JP","Engines":["neural","standard"]},
+            {"Name":"Tomoko","LanguageName":"Japanese","LanguageCode":"ja-JP","Engines":["neural"]},
+            {"Name":"Jihye","LanguageName":"Korean","LanguageCode":"ko-KR","Engines":["neural"]},
+            {"Name":"Seoyeon","LanguageName":"Korean","LanguageCode":"ko-KR","Engines":["neural","standard"]},
+            {"Name":"Mia","LanguageName":"Mexican Spanish","LanguageCode":"es-MX","Engines":["neural","standard"]},
+            {"Name":"Ida","LanguageName":"Norwegian","LanguageCode":"nb-NO","Engines":["neural"]},
+            {"Name":"Liv","LanguageName":"Norwegian","LanguageCode":"nb-NO","Engines":["standard"]},
+            {"Name":"Ewa","LanguageName":"Polish","LanguageCode":"pl-PL","Engines":["standard"]},
+            {"Name":"Jacek","LanguageName":"Polish","LanguageCode":"pl-PL","Engines":["standard"]},
+            {"Name":"Jan","LanguageName":"Polish","LanguageCode":"pl-PL","Engines":["standard"]},
+            {"Name":"Maja","LanguageName":"Polish","LanguageCode":"pl-PL","Engines":["standard"]},
+            {"Name":"Ola","LanguageName":"Polish","LanguageCode":"pl-PL","Engines":["neural"]},
+            {"Name":"Cristiano","LanguageName":"Portuguese","LanguageCode":"pt-PT","Engines":["standard"]},
+            {"Name":"Carmen","LanguageName":"Romanian","LanguageCode":"ro-RO","Engines":["standard"]},
+            {"Name":"Maxim","LanguageName":"Russian","LanguageCode":"ru-RU","Engines":["standard"]},
+            {"Name":"Tatyana","LanguageName":"Russian","LanguageCode":"ru-RU","Engines":["standard"]},
+            {"Name":"Astrid","LanguageName":"Swedish","LanguageCode":"sv-SE","Engines":["standard"]},
+            {"Name":"Elin","LanguageName":"Swedish","LanguageCode":"sv-SE","Engines":["neural"]},
+            {"Name":"Sabrina","LanguageName":"Swiss Standard German","LanguageCode":"de-CH","Engines":["neural"]},
+            {"Name":"Burcu","LanguageName":"Turkish","LanguageCode":"tr-TR","Engines":["neural"]},
+            {"Name":"Filiz","LanguageName":"Turkish","LanguageCode":"tr-TR","Engines":["standard"]},
+            {"Name":"Lupe","LanguageName":"US Spanish","LanguageCode":"es-US","Engines":["neural","standard"]},
+            {"Name":"Miguel","LanguageName":"US Spanish","LanguageCode":"es-US","Engines":["standard"]},
+            {"Name":"Pedro","LanguageName":"US Spanish","LanguageCode":"es-US","Engines":["neural"]},
+            {"Name":"Gwyneth","LanguageName":"Welsh","LanguageCode":"cy-GB","Engines":["standard"]}
+        ];
+
+        let filteredVoices = [...voices];
+
+        function initializeStats() {
+            const neuralCount = voices.filter(voice => voice.Engines.includes('neural')).length;
+            const languageCount = new Set(voices.map(voice => voice.LanguageName)).size;
+            
+            document.getElementById('neural-count').textContent = neuralCount;
+            document.getElementById('language-count').textContent = languageCount;
+        }
+
+        function populateLanguageFilter() {
+            const languages = [...new Set(voices.map(voice => voice.LanguageName))].sort();
+            const languageFilter = document.getElementById('language-filter');
+            
+            languages.forEach(language => {
+                const option = document.createElement('option');
+                option.value = language;
+                option.textContent = language;
+                languageFilter.appendChild(option);
+            });
+        }
+
+        function createVoiceCard(voice) {
+            const card = document.createElement('div');
+            card.className = 'voice-card';
+            
+            const enginesHTML = voice.Engines.map(engine => 
+                `<span class="engine-tag engine-${engine}">${engine}</span>`
+            ).join('');
+            
+            card.innerHTML = `
+                <div class="voice-name">${voice.Name}</div>
+                <div class="voice-language">${voice.LanguageName}</div>
+                <div class="voice-code">${voice.LanguageCode}</div>
+                <div class="engines">${enginesHTML}</div>
+            `;
+            
+            return card;
+        }
+
+        function renderVoices(voicesToRender = filteredVoices) {
+            const container = document.getElementById('voices-container');
+            const noResults = document.getElementById('no-results');
+            
+            container.innerHTML = '';
+            
+            if (voicesToRender.length === 0) {
+                container.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+            
+            container.style.display = 'grid';
+            noResults.style.display = 'none';
+            
+            voicesToRender.forEach(voice => {
+                container.appendChild(createVoiceCard(voice));
+            });
+        }
+
+        function filterVoices() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            const languageFilter = document.getElementById('language-filter').value;
+            const engineFilter = document.getElementById('engine-filter').value;
+            
+            filteredVoices = voices.filter(voice => {
+                const matchesSearch = voice.Name.toLowerCase().includes(searchTerm) || 
+                                    voice.LanguageName.toLowerCase().includes(searchTerm);
+                const matchesLanguage = !languageFilter || voice.LanguageName === languageFilter;
+                const matchesEngine = !engineFilter || voice.Engines.includes(engineFilter);
+                
+                return matchesSearch && matchesLanguage && matchesEngine;
+            });
+            
+            renderVoices();
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeStats();
+            populateLanguageFilter();
+            renderVoices();
+            
+            // Add event listeners
+            document.getElementById('search').addEventListener('input', filterVoices);
+            document.getElementById('language-filter').addEventListener('change', filterVoices);
+            document.getElementById('engine-filter').addEventListener('change', filterVoices);
+        });
+    </script>
+</body>
+</html>
