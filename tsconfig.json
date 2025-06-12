@@ -17,5 +17,5 @@
     "sourceMap": false
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "release", "src/renderer.tsx", "src/ui/**/*"]
+  "exclude": ["node_modules", "dist", "release", "src/renderer.tsx"]
 }
