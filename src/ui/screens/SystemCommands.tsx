@@ -4,6 +4,7 @@ interface SystemCommand {
   command: string;
   enabled: boolean;
   description: string;
+  permissionLevel: 'viewer' | 'moderator' | 'super_moderator';
   // Note: handler function is not included as it's not serializable for IPC
 }
 
@@ -63,6 +64,26 @@ const SystemCommands: React.FC = () => {
     } catch (error) {
       console.error('Failed to toggle command:', error);
       setError(`Failed to ${enabled ? 'enable' : 'disable'} ${command}. Please try again.`);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const changePermissionLevel = async (command: string, permissionLevel: 'viewer' | 'moderator' | 'super_moderator') => {
+    setSaving(command);
+    setError(null);
+    try {
+      await window.electron.ipcRenderer.invoke('commands:setPermissionLevel', command, permissionLevel);
+      
+      // Update local state
+      setCommands(prev => prev.map(cmd => 
+        cmd.command === command ? { ...cmd, permissionLevel } : cmd
+      ));
+      
+      setSuccessMessage(`${command} permission level set to ${permissionLevel}`);
+    } catch (error) {
+      console.error('Failed to change permission level:', error);
+      setError(`Failed to change permission level for ${command}. Please try again.`);
     } finally {
       setSaving(null);
     }
@@ -176,6 +197,16 @@ const SystemCommands: React.FC = () => {
                 color: '#fff', 
                 fontWeight: 'bold',
                 borderBottom: '1px solid #444',
+                width: '160px'
+              }}>
+                Permission Level
+              </th>
+              <th style={{ 
+                padding: '16px', 
+                textAlign: 'center', 
+                color: '#fff', 
+                fontWeight: 'bold',
+                borderBottom: '1px solid #444',
                 width: '120px'
               }}>
                 Enabled
@@ -202,6 +233,27 @@ const SystemCommands: React.FC = () => {
                   fontSize: '14px'
                 }}>
                   {command.description}
+                </td>
+                <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <select
+                    value={command.permissionLevel}
+                    onChange={(e) => changePermissionLevel(command.command, e.target.value as 'viewer' | 'moderator' | 'super_moderator')}
+                    disabled={saving === command.command}
+                    style={{
+                      background: '#333',
+                      color: '#fff',
+                      border: '1px solid #555',
+                      borderRadius: 4,
+                      padding: '6px 12px',
+                      fontSize: '14px',
+                      cursor: saving === command.command ? 'not-allowed' : 'pointer',
+                      opacity: saving === command.command ? 0.6 : 1
+                    }}
+                  >
+                    <option value="viewer">👤 Viewer</option>
+                    <option value="moderator">🛡️ Moderator</option>
+                    <option value="super_moderator">⭐ Super Moderator</option>
+                  </select>
                 </td>
                 <td style={{ padding: '16px', textAlign: 'center' }}>
                   <label style={{ 
@@ -243,6 +295,11 @@ const SystemCommands: React.FC = () => {
           <li>Commands are triggered when viewers type them in chat</li>
           <li>Responses are automatically sent back to the same chat</li>
           <li>Only enabled commands will respond to chat messages</li>
+          <li><strong>Permission Levels:</strong></li>
+          <li style={{ marginLeft: 20 }}>👤 <strong>Viewer:</strong> Anyone can use the command</li>
+          <li style={{ marginLeft: 20 }}>🛡️ <strong>Moderator:</strong> Only moderators and super moderators can use</li>
+          <li style={{ marginLeft: 20 }}>⭐ <strong>Super Moderator:</strong> Only super moderators can use</li>
+          <li>User roles can be managed in the Viewers screen</li>
           <li>Changes take effect immediately</li>
         </ul>
       </div>

@@ -91,10 +91,11 @@ function saveEventConfig(configs: Record<string, any>) {
   fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
 }
 
-// Command settings (for system commands enable/disable)
+// Command settings (for system commands enable/disable and permissions)
 interface CommandSettings {
   [command: string]: {
     enabled: boolean;
+    permissionLevel?: 'viewer' | 'moderator' | 'super_moderator';
   };
 }
 
@@ -103,9 +104,9 @@ function loadCommandSettings(): CommandSettings {
     const data = fs.readFileSync(commandSettingsFilePath, 'utf-8');
     return JSON.parse(data);
   } catch {
-    // Default: all commands enabled
+    // Default: all commands enabled at viewer level
     return {
-      '~hello': { enabled: true }
+      '~hello': { enabled: true, permissionLevel: 'viewer' }
     };
   }
 }
@@ -200,6 +201,9 @@ app.whenReady().then(async () => {
   // Apply settings to the command processor
   Object.entries(commandSettings).forEach(([command, config]) => {
     commandProcessor.setCommandEnabled(command, config.enabled);
+    if (config.permissionLevel) {
+      commandProcessor.setCommandPermissionLevel(command, config.permissionLevel);
+    }
   });
   
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
@@ -437,7 +441,26 @@ app.whenReady().then(async () => {
     
     // Save to persistent storage
     const currentSettings = loadCommandSettings();
-    currentSettings[command] = { enabled };
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled, permissionLevel: 'viewer' };
+    } else {
+      currentSettings[command].enabled = enabled;
+    }
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
+
+  ipcMain.handle('commands:setPermissionLevel', async (_event, command: string, permissionLevel: 'viewer' | 'moderator' | 'super_moderator') => {
+    commandProcessor.setCommandPermissionLevel(command, permissionLevel);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    if (!currentSettings[command]) {
+      currentSettings[command] = { enabled: true, permissionLevel };
+    } else {
+      currentSettings[command].permissionLevel = permissionLevel;
+    }
     saveCommandSettings(currentSettings);
     
     return true;
