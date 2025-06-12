@@ -10,6 +10,7 @@ import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
+import { commandProcessor } from './backend/services/commandProcessor';
 
 // Use require for Node.js built-in modules and potentially problematic packages
 const fs = require('fs');
@@ -19,6 +20,7 @@ const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
+const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -87,6 +89,29 @@ function loadEventConfig(): Record<string, any> {
 
 function saveEventConfig(configs: Record<string, any>) {
   fs.writeFileSync(eventConfigFilePath, JSON.stringify(configs, null, 2), 'utf-8');
+}
+
+// Command settings (for system commands enable/disable)
+interface CommandSettings {
+  [command: string]: {
+    enabled: boolean;
+  };
+}
+
+function loadCommandSettings(): CommandSettings {
+  try {
+    const data = fs.readFileSync(commandSettingsFilePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    // Default: all commands enabled
+    return {
+      '!hello': { enabled: true }
+    };
+  }
+}
+
+function saveCommandSettings(settings: CommandSettings) {
+  fs.writeFileSync(commandSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -169,6 +194,20 @@ app.whenReady().then(async () => {
   cleanUpTempTTSFiles();
   initDatabase();
   registerEventBusDbListener();
+  
+  // Debug: Check if command processor is imported correctly
+  console.log('[Main] Command processor imported:', !!commandProcessor);
+  console.log('[Main] Command processor methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(commandProcessor)));
+  
+  // Initialize command processor with saved settings
+  const commandSettings = loadCommandSettings();
+  console.log('[Main] Loaded command settings:', commandSettings);
+  // Apply settings to the command processor
+  Object.entries(commandSettings).forEach(([command, config]) => {
+    console.log('[Main] Applying setting:', command, config);
+    commandProcessor.setCommandEnabled(command, config.enabled);
+  });
+  
   // const mainWindow = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
 
   // Auto-connect to Twitch if credentials exist
@@ -385,6 +424,37 @@ app.whenReady().then(async () => {
   ipcMain.handle('tts:setSettings', async (_event, settings: TTSSettings) => {
     saveTTSSettings(settings);
     return true;
+  });
+
+  // Command system IPC handlers
+  ipcMain.handle('commands:getSystemCommands', async () => {
+    return commandProcessor.getSystemCommands();
+  });
+  
+  ipcMain.handle('commands:setEnabled', async (_event, command: string, enabled: boolean) => {
+    commandProcessor.setCommandEnabled(command, enabled);
+    
+    // Save to persistent storage
+    const currentSettings = loadCommandSettings();
+    currentSettings[command] = { enabled };
+    saveCommandSettings(currentSettings);
+    
+    return true;
+  });
+  
+  ipcMain.handle('commands:getSettings', async () => {
+    return loadCommandSettings();
+  });
+
+  // Chat message sending IPC handler
+  ipcMain.handle('chat:sendMessage', async (_event, message: string) => {
+    try {
+      await platformIntegrationService.sendChatMessage(message);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to send chat message:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('polly:speak', async (_event, { text, voiceId, engine }) => {
