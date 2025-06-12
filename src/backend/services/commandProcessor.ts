@@ -15,7 +15,6 @@ class CommandProcessor extends EventEmitter {
 
   constructor(initialSettings?: Record<string, { enabled: boolean }>) {
     super();
-    console.log('[CommandProcessor] Initializing command processor...');
     this.initializeSystemCommands();
     this.setupEventListeners();
     
@@ -23,13 +22,12 @@ class CommandProcessor extends EventEmitter {
     if (initialSettings) {
       this.loadSettings(initialSettings);
     }
-    console.log('[CommandProcessor] Command processor initialized with', this.systemCommands.size, 'commands');
   }
 
   private initializeSystemCommands() {
-    // !hello command
+    // ~hello command
     const helloCommand: SystemCommand = {
-      command: '!hello',
+      command: '~hello',
       enabled: true, // Default enabled, will be overridden by settings
       description: 'Replies with a hello message to the user',
       handler: async (event: StreamEvent) => {
@@ -38,7 +36,7 @@ class CommandProcessor extends EventEmitter {
       }
     };
 
-    this.systemCommands.set('!hello', helloCommand);
+    this.systemCommands.set('~hello', helloCommand);
   }
 
   private loadSettings(settings: Record<string, { enabled: boolean }>) {
@@ -51,16 +49,12 @@ class CommandProcessor extends EventEmitter {
   }
 
   private setupEventListeners() {
-    console.log('[CommandProcessor] Setting up event listeners...');
     // Listen for chat events and process commands
     eventBus.onEventType('chat', async (event: StreamEvent) => {
-      console.log('[CommandProcessor] Received chat event:', event.message);
       if (!event.message) return;
       
       const message = event.message.trim();
-      if (!message.startsWith('!')) return;
-      
-      console.log('[CommandProcessor] Processing potential command:', message);
+      if (!message.startsWith('~')) return;
       
       // Extract command (first word)
       const command = message.split(' ')[0].toLowerCase();
@@ -75,16 +69,17 @@ class CommandProcessor extends EventEmitter {
           console.error(`[CommandProcessor] Error executing command ${command}:`, error);
           this.emit('commandExecuted', { command, user: event.user, success: false, error });
         }
-      } else {
-        console.log(`[CommandProcessor] Command ${command} not found or disabled. Available commands:`, Array.from(this.systemCommands.keys()));
       }
     });
-    console.log('[CommandProcessor] Event listeners setup complete');
   }
 
-  // Get all system commands for UI
-  getSystemCommands(): SystemCommand[] {
-    return Array.from(this.systemCommands.values());
+  // Get all system commands for UI (without the handler functions)
+  getSystemCommands(): Omit<SystemCommand, 'handler'>[] {
+    return Array.from(this.systemCommands.values()).map(cmd => ({
+      command: cmd.command,
+      enabled: cmd.enabled,
+      description: cmd.description
+    }));
   }
 
   // Enable/disable a system command
@@ -104,6 +99,4 @@ class CommandProcessor extends EventEmitter {
   }
 }
 
-console.log('[CommandProcessor] Creating command processor singleton...');
 export const commandProcessor = new CommandProcessor();
-console.log('[CommandProcessor] Command processor singleton created');

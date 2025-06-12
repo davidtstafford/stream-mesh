@@ -4,24 +4,45 @@ interface SystemCommand {
   command: string;
   enabled: boolean;
   description: string;
+  // Note: handler function is not included as it's not serializable for IPC
 }
 
 const SystemCommands: React.FC = () => {
   const [commands, setCommands] = useState<SystemCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Load commands on mount
+  // Load commands on mount and when screen gains focus
   useEffect(() => {
     loadCommands();
+    
+    const handleFocus = () => {
+      loadCommands();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
+  // Clear success message after delay
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   const loadCommands = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const systemCommands = await window.electron.ipcRenderer.invoke('commands:getSystemCommands');
       setCommands(systemCommands);
     } catch (error) {
       console.error('Failed to load system commands:', error);
+      setError('Failed to load system commands. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -29,6 +50,7 @@ const SystemCommands: React.FC = () => {
 
   const toggleCommand = async (command: string, enabled: boolean) => {
     setSaving(command);
+    setError(null);
     try {
       await window.electron.ipcRenderer.invoke('commands:setEnabled', command, enabled);
       
@@ -36,8 +58,11 @@ const SystemCommands: React.FC = () => {
       setCommands(prev => prev.map(cmd => 
         cmd.command === command ? { ...cmd, enabled } : cmd
       ));
+      
+      setSuccessMessage(`${command} ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
       console.error('Failed to toggle command:', error);
+      setError(`Failed to ${enabled ? 'enable' : 'disable'} ${command}. Please try again.`);
     } finally {
       setSaving(null);
     }
@@ -54,10 +79,57 @@ const SystemCommands: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', color: '#fff' }}>
-      <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>System Commands</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <h2 style={{ fontWeight: 'bold', margin: 0 }}>System Commands</h2>
+        <button
+          onClick={loadCommands}
+          disabled={loading}
+          style={{
+            background: loading ? '#555' : '#3a8dde',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 6,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}
+        >
+          {loading ? '🔄' : '🔄 Refresh'}
+        </button>
+      </div>
+      
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Built-in commands provided by Stream Mesh. Toggle to enable/disable each command.
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          background: '#dc3545',
+          color: '#fff',
+          padding: '12px 16px',
+          borderRadius: 6,
+          marginBottom: 16,
+          fontSize: '14px'
+        }}>
+          ❌ {error}
+        </div>
+      )}
+
+      {/* Success Message */}
+      {successMessage && (
+        <div style={{
+          background: '#28a745',
+          color: '#fff',
+          padding: '12px 16px',
+          borderRadius: 6,
+          marginBottom: 16,
+          fontSize: '14px'
+        }}>
+          ✅ {successMessage}
+        </div>
+      )}
       
       {commands.length === 0 ? (
         <div style={{ 

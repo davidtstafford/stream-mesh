@@ -134,12 +134,12 @@ const Developer: React.FC = () => {
   const testCommand = async () => {
     setLoading('command');
     try {
-      // Simulate a !hello command
+      // Simulate a ~hello command
       await triggerEvent('chat', {
         user: 'TestUser',
-        message: '!hello'
+        message: '~hello'
       });
-      console.log('Triggered !hello command test');
+      console.log('Triggered ~hello command test');
     } catch (error) {
       console.error('Failed to trigger command test:', error);
     }
@@ -260,7 +260,7 @@ const Developer: React.FC = () => {
               opacity: loading !== null && loading !== 'command' ? 0.5 : 1
             }}
           >
-            {loading === 'command' ? '🔄 Testing Command...' : '🤖 Test !hello Command'}
+            {loading === 'command' ? '🔄 Testing Command...' : '🤖 Test ~hello Command'}
           </button>
         </div>
       </div>
@@ -279,7 +279,7 @@ const Developer: React.FC = () => {
           <li>TTS will announce events if configured and enabled</li>
           <li>All events are stored in the database and visible in Event History</li>
           <li>Use Events Admin to configure which events are displayed</li>
-          <li>Command testing will simulate a user typing !hello in chat</li>
+          <li>Command testing will simulate a user typing ~hello in chat</li>
           <li>Check the browser console for event processing logs</li>
         </ul>
       </div>

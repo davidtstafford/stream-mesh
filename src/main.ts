@@ -105,7 +105,7 @@ function loadCommandSettings(): CommandSettings {
   } catch {
     // Default: all commands enabled
     return {
-      '!hello': { enabled: true }
+      '~hello': { enabled: true }
     };
   }
 }
@@ -195,16 +195,10 @@ app.whenReady().then(async () => {
   initDatabase();
   registerEventBusDbListener();
   
-  // Debug: Check if command processor is imported correctly
-  console.log('[Main] Command processor imported:', !!commandProcessor);
-  console.log('[Main] Command processor methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(commandProcessor)));
-  
   // Initialize command processor with saved settings
   const commandSettings = loadCommandSettings();
-  console.log('[Main] Loaded command settings:', commandSettings);
   // Apply settings to the command processor
   Object.entries(commandSettings).forEach(([command, config]) => {
-    console.log('[Main] Applying setting:', command, config);
     commandProcessor.setCommandEnabled(command, config.enabled);
   });
   
@@ -428,7 +422,14 @@ app.whenReady().then(async () => {
 
   // Command system IPC handlers
   ipcMain.handle('commands:getSystemCommands', async () => {
-    return commandProcessor.getSystemCommands();
+    try {
+      const commands = commandProcessor.getSystemCommands();
+      console.log('[Main] Returning system commands:', commands);
+      return commands;
+    } catch (error) {
+      console.error('[Main] Error getting system commands:', error);
+      throw error;
+    }
   });
   
   ipcMain.handle('commands:setEnabled', async (_event, command: string, enabled: boolean) => {
