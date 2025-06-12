@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const LinkToStreams: React.FC = () => {
   const [twitchUser, setTwitchUser] = useState("");
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   useEffect(() => {
     window.electron.ipcRenderer.invoke("twitch:status").then((status) => {
@@ -38,8 +40,7 @@ const LinkToStreams: React.FC = () => {
   return (
     <div
       style={{
-        maxWidth: 400,
-        margin: "0 auto",
+        ...getResponsiveContainerStyle(400),
         color: "var(--text-color, #fff)",
       }}
     >

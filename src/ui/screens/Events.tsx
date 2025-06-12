@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import EventWindow from '../components/EventWindow';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface WindowPreset {
   id: string;
@@ -13,6 +14,7 @@ interface WindowPreset {
 const Events: React.FC = () => {
   const [windowCounter, setWindowCounter] = useState(1);
   const [windowPresets, setWindowPresets] = useState<WindowPreset[]>([]);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   // Load window presets
   useEffect(() => {
@@ -79,7 +81,7 @@ const Events: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', color: 'var(--text-color, #fff)', height: 'calc(100vh - 64px)' }}>
+    <div style={{ ...getResponsiveContainerStyle(1200), color: 'var(--text-color, #fff)', height: 'calc(100vh - 64px)' }}>
       {/* Header with Window Preset buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontWeight: 'bold', margin: 0 }}>Events</h2>

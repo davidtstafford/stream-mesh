@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const Developer: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   const triggerEvent = async (eventType: string, eventData: any) => {
     setLoading(eventType);
@@ -147,7 +149,7 @@ const Developer: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(800), color: '#fff' }}>
       <h2 style={{ color: '#ffd700', fontWeight: 'bold', marginBottom: 24 }}>
         🛠️ Developer Tools
       </h2>

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 
 const OBS: React.FC = () => {
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
 
   // Chat overlay logic
@@ -56,7 +58,7 @@ const OBS: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(600), color: '#fff' }}>
       <h2 style={{ marginTop: 24 }}>OBS Integration</h2>
 
       {/* Chat Overlay Section */}

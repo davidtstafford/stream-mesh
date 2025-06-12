@@ -1,10 +1,12 @@
 import React from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const Preferences: React.FC = () => {
   const { theme, setTheme } = useTheme();
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
   return (
-    <div style={{ maxWidth: 500, margin: '0 auto', color: 'var(--text-color, #fff)' }}>
+    <div style={{ ...getResponsiveContainerStyle(500), color: 'var(--text-color, #fff)' }}>
       <h2 style={{ fontWeight: 'bold', marginBottom: 16 }}>Preferences</h2>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Theme</div>

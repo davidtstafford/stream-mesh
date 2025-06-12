@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface SystemCommand {
   command: string;
@@ -15,6 +16,7 @@ const SystemCommands: React.FC = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { getResponsiveContainerStyle } = useResponsiveLayout();
 
   // Load commands on mount and when screen gains focus
   useEffect(() => {
@@ -112,7 +114,7 @@ const SystemCommands: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 700, margin: '0 auto', color: '#fff', textAlign: 'center' }}>
+      <div style={{ ...getResponsiveContainerStyle(700), color: '#fff', textAlign: 'center' }}>
         <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>System Commands</h2>
         <div style={{ color: '#aaa' }}>Loading commands...</div>
       </div>
@@ -120,7 +122,7 @@ const SystemCommands: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', color: '#fff' }}>
+    <div style={{ ...getResponsiveContainerStyle(700), color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h2 style={{ fontWeight: 'bold', margin: 0 }}>System Commands</h2>
         <button
