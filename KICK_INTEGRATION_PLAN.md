@@ -71,13 +71,12 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 
 ### 2.3 Event Bus Updates
 - [x] Update `StreamEvent` type with KIK event types:
-  - `kick-chat`
-  - `kick-follow`
-  - `kick-subscription`
-  - `kick-subgift`
-  - `kick-donation`
-  - `kick-raid`
-  - `kick-host`
+  - `chat.message.sent` - Chat messages
+  - `channel.followed` - New followers  
+  - `channel.subscription.new` - New subscriptions
+  - `channel.subscription.renewal` - Subscription renewals
+  - `channel.subscription.gifts` - Gifted subscriptions
+  - `moderation.banned` - User bans
 - [x] Test event emission for KIK events
 
 ### 2.4 Database Integration
@@ -297,15 +296,14 @@ const KICK_REDIRECT_URI = 'http://localhost:3301/auth/kick/callback';
 ```
 
 ### Event Type Mapping
-| KIK Event | Stream Mesh Type |
-|-----------|------------------|
-| message | kick-chat |
-| follow | kick-follow |
-| subscription | kick-subscription |
-| gift_subscription | kick-subgift |
-| tip | kick-donation |
-| raid | kick-raid |
-| host | kick-host |
+| KIK Event | Stream Mesh Type | Description |
+|-----------|------------------|-------------|
+| chat.message.sent | chat.message.sent | Chat messages |
+| channel.followed | channel.followed | New followers |
+| channel.subscription.new | channel.subscription.new | New subscriptions |
+| channel.subscription.renewal | channel.subscription.renewal | Subscription renewals |
+| channel.subscription.gifts | channel.subscription.gifts | Gifted subscriptions |
+| moderation.banned | moderation.banned | User bans |
 
 ---
 

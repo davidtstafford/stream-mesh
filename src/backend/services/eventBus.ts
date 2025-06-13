@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 // Unified event interface for all stream events
 export interface StreamEvent {
   type: 'chat' | 'subscription' | 'resub' | 'subgift' | 'cheer' | 'hosted' | 'raided' | 'redeem' | 
-        'kick-chat' | 'kick-follow' | 'kick-subscription' | 'kick-subgift' | 'kick-donation' | 'kick-raid' | 'kick-host';
+        'chat.message.sent' | 'channel.followed' | 'channel.subscription.new' | 'channel.subscription.renewal' | 'channel.subscription.gifts' | 'moderation.banned';
   platform: string;
   channel: string;
   user: string;
