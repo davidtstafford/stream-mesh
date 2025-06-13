@@ -2,6 +2,8 @@
 import { EventEmitter } from 'events';
 import tmi from 'tmi.js';
 import { eventBus } from './eventBus';
+import type { KickApiService } from './kickApi';
+import { createKickApiService } from './kickApi';
 
 export type Platform = 'twitch' | 'kick';
 
@@ -31,6 +33,7 @@ class PlatformIntegrationService extends EventEmitter {
   private twitchClient: any = null;
   private twitchAuth: TwitchAuth | null = null;
   private kickAuth: KickAuth | null = null;
+  private kickApiService: KickApiService | null = null;
 
   connectTwitch(username: string) {
     if (!username || typeof username !== 'string' || !username.trim()) {
@@ -211,6 +214,25 @@ class PlatformIntegrationService extends EventEmitter {
     }
     
     this.kickAuth = auth;
+    
+    // Create KIK API service with token refresh callback
+    this.kickApiService = createKickApiService(
+      auth.accessToken,
+      auth.refreshToken,
+      auth.expiresAt,
+      (newAuth: { accessToken: string; refreshToken: string; expiresAt: number }) => {
+        // Update stored auth when tokens are refreshed
+        if (this.kickAuth) {
+          this.kickAuth.accessToken = newAuth.accessToken;
+          this.kickAuth.refreshToken = newAuth.refreshToken;
+          this.kickAuth.expiresAt = newAuth.expiresAt;
+          
+          // Emit event so main.ts can save the updated tokens
+          this.emit('kick-token-refreshed', this.kickAuth);
+        }
+      }
+    );
+    
     this.connections.kick = { platform: 'kick', username: auth.username, connected: true };
     this.emit('status', this.connections.kick);
     
@@ -223,6 +245,7 @@ class PlatformIntegrationService extends EventEmitter {
   async disconnectKick() {
     // TODO: Close KIK WebSocket connections when implemented
     this.kickAuth = null;
+    this.kickApiService = null;
     this.connections.kick = { platform: 'kick', username: '', connected: false };
     this.emit('status', this.connections.kick);
     return this.connections.kick;
@@ -260,16 +283,17 @@ class PlatformIntegrationService extends EventEmitter {
       eventBus.emitEvent(chatEvent);
       this.emit('chat', chatEvent);
     } else if (platform === 'kick') {
-      if (!this.connections.kick.connected || !this.kickAuth) {
+      if (!this.connections.kick.connected || !this.kickApiService) {
         throw new Error('Not connected to KIK');
       }
       
-      // TODO: Implement KIK chat message sending via API
-      // For Phase 2: Core Platform Integration
+      // Send message using KIK API service
+      const channelSlug = this.connections.kick.username;
+      await this.kickApiService.sendChatMessage(channelSlug, message);
       
       // Emit a chat event for our own message so it appears in the UI
       const chatEvent = {
-        type: 'chat' as const,
+        type: 'kick-chat' as const,
         platform: 'kick',
         channel: this.connections.kick.username,
         user: this.connections.kick.username,

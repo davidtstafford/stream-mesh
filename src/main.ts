@@ -270,6 +270,12 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Listen for KIK token refresh events to save updated tokens
+  platformIntegrationService.on('kick-token-refreshed', (newAuth) => {
+    console.log('KIK tokens refreshed, saving to storage...');
+    saveKickAuth(newAuth);
+  });
+
   // Register all IPC handlers (chat, twitch, etc.)
   // IPC handlers for chat messages
   ipcMain.handle('chat:insert', async (_event, msg) => {
