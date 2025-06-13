@@ -1,14 +1,14 @@
-# KIK Integration Plan for Stream Mesh
+# KICK Integration Plan for Stream Mesh
 
 ## Project Overview
-Integrate KIK streaming platform support alongside existing Twitch integration, providing unified event handling, authentication, and real-time chat/event processing.
+Integrate KICK streaming platform support alongside existing Twitch integration, providing unified event handling, authentication, and real-time chat/event processing.
 
-**KIK Application Details:**
+**KICK Application Details:**
 - **Client ID**: `01JXMTP4GNFCM5YJG5EDPSBWMB`
 - **Redirect URL**: `http://localhost:3301/auth/kick/callback`
 - **OAuth Port**: 3301 (different from Twitch's 3300)
 
-**Required KIK Permissions:**
+**Required KICK Permissions:**
 - ✅ Read user information (including email address)
 - ✅ Read stream key  
 - ✅ Read channel information
@@ -20,7 +20,7 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 1: Authentication Foundation 🔐
 
 ### 1.1 OAuth Setup
-- [x] Create KIK OAuth service (`src/backend/services/kickOAuth.ts`)
+- [x] Create KICK OAuth service (`src/backend/services/kickOAuth.ts`)
 - [x] Implement authorization code + PKCE flow
 - [x] Add redirect URL handler on port 3301
 - [x] Implement token storage (encrypted local storage)
@@ -29,13 +29,13 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ### 1.2 Platform Type Updates
 - [x] Update `Platform` type: `'twitch' | 'kick'`
 - [x] Create `KickAuth` interface
-- [x] Add KIK auth storage functions to `main.ts`
+- [x] Add KICK auth storage functions to `main.ts`
 
 ### 1.3 Basic UI Integration
-- [x] Add KIK section to `LinkToStreams.tsx`
+- [x] Add KICK section to `LinkToStreams.tsx`
 - [x] Implement connect/disconnect buttons
-- [x] Add KIK connection status display
-- [x] Style with KIK brand colors (#53fc18)
+- [x] Add KICK connection status display
+- [x] Style with KICK brand colors (#53fc18)
 
 ### 1.4 IPC Handlers
 - [x] Add `kick:oauth` handler in `main.ts`
@@ -56,34 +56,34 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 2: Core Platform Integration 🔗
 
 ### 2.1 Platform Integration Service
-- [x] Add KIK connection methods to `PlatformIntegrationService`
+- [x] Add KICK connection methods to `PlatformIntegrationService`
 - [x] Implement `connectKickWithOAuth(auth: KickAuth)`
 - [x] Implement `disconnectKick()`
 - [x] Implement `getKickStatus()`
-- [x] Add KIK to connections record
+- [x] Add KICK to connections record
 
-### 2.2 KIK API Service
-- [x] Create KIK API service (`src/backend/services/kickApi.ts`)
+### 2.2 KICK API Service
+- [x] Create KICK API service (`src/backend/services/kickApi.ts`)
 - [x] Implement user info fetching
 - [x] Implement channel info fetching
 - [x] Implement chat message sending
 - [x] Add proper error handling and rate limiting
 
 ### 2.3 Event Bus Updates
-- [x] Update `StreamEvent` type with KIK event types:
+- [x] Update `StreamEvent` type with KICK event types:
   - `chat.message.sent` - Chat messages
   - `channel.followed` - New followers  
   - `channel.subscription.new` - New subscriptions
   - `channel.subscription.renewal` - Subscription renewals
   - `channel.subscription.gifts` - Gifted subscriptions
   - `moderation.banned` - User bans
-- [x] Test event emission for KIK events
+- [x] Test event emission for KICK events
 
 ### 2.4 Database Integration
-- [ ] Update viewer key generation for KIK (`kick:userId`)
-- [ ] Test viewer storage with KIK platform
-- [ ] Verify event storage works with KIK events
-- [ ] Test cross-platform viewer uniqueness
+- [x] Update viewer key generation for KICK (`kick:userId`)
+- [x] Test viewer storage with KICK platform
+- [x] Verify event storage works with KICK events
+- [x] Test cross-platform viewer uniqueness
 
 **Files to Create:**
 - `src/backend/services/kickApi.ts`
@@ -98,7 +98,7 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 3: Real-time Event System 🔄
 
 ### 3.1 WebSocket Integration
-- [ ] Create KIK WebSocket service (`src/backend/services/kickWebSocket.ts`)
+- [ ] Create KICK WebSocket service (`src/backend/services/kickWebSocket.ts`)
 - [ ] Implement connection management
 - [ ] Add automatic reconnection logic
 - [ ] Handle WebSocket authentication
@@ -112,13 +112,13 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 - [ ] Add event data parsing and normalization
 
 ### 3.3 Event Bus Integration
-- [ ] Connect KIK WebSocket to event bus
-- [ ] Test all KIK events flow to UI
-- [ ] Verify database storage of KIK events
+- [ ] Connect KICK WebSocket to event bus
+- [ ] Test all KICK events flow to UI
+- [ ] Verify database storage of KICK events
 - [ ] Test event filtering by platform
 
 ### 3.4 UI Event Display
-- [ ] Add KIK events to `EventWindow.tsx`
+- [ ] Add KICK events to `EventWindow.tsx`
 - [ ] Test real-time event display
 - [ ] Verify event styling and colors
 - [ ] Test event filtering functionality
@@ -134,22 +134,22 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 
 ## Phase 4: Developer Testing Tools 🧪
 
-### 4.1 KIK Developer Screen
+### 4.1 KICK Developer Screen
 - [ ] Create `src/ui/screens/DeveloperKick.tsx`
-- [ ] Add all KIK event simulation buttons
+- [ ] Add all KICK event simulation buttons
 - [ ] Implement custom data input fields
 - [ ] Add automated event sequences
-- [ ] Style with KIK theme
+- [ ] Style with KICK theme
 
 ### 4.2 Event Configuration
-- [ ] Add KIK platform to `EventsAdmin.tsx`
-- [ ] Configure KIK event colors and display names
-- [ ] Test event enabling/disabling for KIK
-- [ ] Verify event window presets work with KIK
+- [ ] Add KICK platform to `EventsAdmin.tsx`
+- [ ] Configure KICK event colors and display names
+- [ ] Test event enabling/disabling for KICK
+- [ ] Verify event window presets work with KICK
 
 ### 4.3 Developer Tools Integration
-- [ ] Add KIK tab to main Developer screen
-- [ ] Test all KIK event simulations
+- [ ] Add KICK tab to main Developer screen
+- [ ] Test all KICK event simulations
 - [ ] Verify events appear in Event History
 - [ ] Test cross-platform event mixing
 
@@ -166,20 +166,20 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 5: Command System Integration 💬
 
 ### 5.1 Cross-Platform Commands
-- [ ] Update `CommandProcessor` to handle KIK platform
-- [ ] Test system commands work on KIK (`~voices`, `~setvoice`, etc.)
-- [ ] Implement KIK chat message sending
-- [ ] Test command permissions with KIK users
+- [ ] Update `CommandProcessor` to handle KICK platform
+- [ ] Test system commands work on KICK (`~voices`, `~setvoice`, etc.)
+- [ ] Implement KICK chat message sending
+- [ ] Test command permissions with KICK users
 
 ### 5.2 Viewer Management
-- [ ] Test KIK viewers appear in Viewers screen
-- [ ] Verify viewer settings work for KIK users
-- [ ] Test TTS voice settings for KIK viewers
-- [ ] Test role assignment for KIK users
+- [ ] Test KICK viewers appear in Viewers screen
+- [ ] Verify viewer settings work for KICK users
+- [ ] Test TTS voice settings for KICK viewers
+- [ ] Test role assignment for KICK users
 
 ### 5.3 Permission System
-- [ ] Map KIK user roles to Stream Mesh permissions
-- [ ] Test moderator commands from KIK
+- [ ] Map KICK user roles to Stream Mesh permissions
+- [ ] Test moderator commands from KICK
 - [ ] Verify permission checking works across platforms
 - [ ] Test cross-platform command responses
 
@@ -193,10 +193,10 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 6: TTS Integration 🔊
 
 ### 6.1 Seamless TTS Support
-- [ ] Test KIK chat messages trigger TTS
-- [ ] Verify voice settings work for KIK users
-- [ ] Test TTS filtering rules apply to KIK
-- [ ] Ensure KIK messages respect TTS disabled setting
+- [ ] Test KICK chat messages trigger TTS
+- [ ] Verify voice settings work for KICK users
+- [ ] Test TTS filtering rules apply to KICK
+- [ ] Ensure KICK messages respect TTS disabled setting
 
 ### 6.2 Cross-Platform TTS
 - [ ] Test both platforms feeding into same TTS queue
@@ -205,9 +205,9 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 - [ ] Test TTS muting functionality
 
 ### 6.3 TTS Commands
-- [ ] Test `~setvoice` command from KIK
-- [ ] Test `~myvoice` command from KIK  
-- [ ] Test `~voices` command provides URL from KIK
+- [ ] Test `~setvoice` command from KICK
+- [ ] Test `~myvoice` command from KICK  
+- [ ] Test `~voices` command provides URL from KICK
 - [ ] Verify TTS settings apply to both platforms
 
 **Files to Modify:**
@@ -219,14 +219,14 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 ## Phase 7: UI Polish & Final Integration ✨
 
 ### 7.1 UI Consistency
-- [ ] Apply KIK branding consistently
-- [ ] Update all platform selectors to include KIK
-- [ ] Test responsive layouts with KIK elements
+- [ ] Apply KICK branding consistently
+- [ ] Update all platform selectors to include KICK
+- [ ] Test responsive layouts with KICK elements
 - [ ] Verify dark/light theme support
 
 ### 7.2 Event Window Enhancements
-- [ ] Test KIK events in standalone event windows
-- [ ] Verify event window presets include KIK events
+- [ ] Test KICK events in standalone event windows
+- [ ] Verify event window presets include KICK events
 - [ ] Test event filtering by platform
 - [ ] Ensure proper event sorting and display
 
@@ -234,7 +234,7 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 - [ ] Test platform-specific settings persistence
 - [ ] Verify connection state restoration on app restart
 - [ ] Test event configuration saves properly
-- [ ] Ensure all settings screens include KIK options
+- [ ] Ensure all settings screens include KICK options
 
 ### 7.4 Error Handling
 - [ ] Test connection failure scenarios
@@ -271,16 +271,16 @@ Integrate KIK streaming platform support alongside existing Twitch integration, 
 - [ ] Test database performance with increased load
 
 ### 8.4 Documentation Updates
-- [ ] Update README.md with KIK support information
-- [ ] Document KIK-specific configuration steps
-- [ ] Add troubleshooting guide for KIK connection
+- [ ] Update README.md with KICK support information
+- [ ] Document KICK-specific configuration steps
+- [ ] Add troubleshooting guide for KICK connection
 - [ ] Update build documentation if needed
 
 ---
 
 ## Technical Implementation Notes
 
-### KIK API Endpoints
+### KICK API Endpoints
 ```
 OAuth: https://kick.com/oauth2/authorize
 Token: https://kick.com/oauth2/token
@@ -296,7 +296,7 @@ const KICK_REDIRECT_URI = 'http://localhost:3301/auth/kick/callback';
 ```
 
 ### Event Type Mapping
-| KIK Event | Stream Mesh Type | Description |
+| KICK Event | Stream Mesh Type | Description |
 |-----------|------------------|-------------|
 | chat.message.sent | chat.message.sent | Chat messages |
 | channel.followed | channel.followed | New followers |
@@ -320,22 +320,28 @@ const KICK_REDIRECT_URI = 'http://localhost:3301/auth/kick/callback';
 - [ ] Phase 8: Testing & Documentation
 
 ### Current Status
-**Phase**: Phase 3 - Real-time Event System  
+**Phase**: Phase 2 Complete - Ready for Phase 3  
 **Last Updated**: June 13, 2025  
-**Next Milestone**: Complete Phase 3 - Implement KIK WebSocket connection for real-time chat and events
+**Next Milestone**: Begin Phase 3 - Implement KICK WebSocket connection for real-time chat and events
+
+**Phase 2.4 Database Integration - COMPLETED ✅**
+- ✅ Viewer key generation works correctly for KICK platform (`kick:userId` format)
+- ✅ Cross-platform viewer uniqueness verified (Twitch and KICK users with same ID get different keys)
+- ✅ Event storage compatibility confirmed for all KICK event types
+- ✅ Database integration tests pass successfully
 
 ---
 
 ## Notes & Issues
 
 ### Known Limitations
-- KIK API rate limits may be different from Twitch
+- KICK API rate limits may be different from Twitch
 - WebSocket connection stability needs testing
-- Some KIK events may not have direct Twitch equivalents
+- Some KICK events may not have direct Twitch equivalents
 
 ### Future Enhancements
-- Multi-account support (multiple KIK accounts)
-- KIK-specific features (emotes, badges)
+- Multi-account support (multiple KICK accounts)
+- KICK-specific features (emotes, badges)
 - Advanced cross-platform analytics
 - Platform-specific command customization
 

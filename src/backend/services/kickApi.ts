@@ -1,4 +1,4 @@
-// KIK API service for handling KIK-specific API calls
+// KICK API service for handling KICK-specific API calls
 
 const CLIENT_ID = '01JXMTP4GNFCM5YJG5EDPSBWMB';
 
@@ -79,7 +79,7 @@ export class KickApiService {
         console.log('[KickApi] Token refreshed successfully');
       } catch (error) {
         console.error('[KickApi] Failed to refresh token:', error);
-        throw new Error('Failed to refresh KIK access token');
+        throw new Error('Failed to refresh KICK access token');
       }
     }
   }
@@ -102,7 +102,7 @@ export class KickApiService {
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => 'Unknown error');
-      const error = new Error(`KIK API error: ${response.status} ${response.statusText}`) as KickApiError;
+      const error = new Error(`KICK API error: ${response.status} ${response.statusText}`) as KickApiError;
       error.status = response.status;
       error.response = errorBody;
       throw error;
@@ -140,7 +140,7 @@ export class KickApiService {
   // Get chatroom ID for WebSocket connection
   async getChatroomId(channelSlug: string): Promise<number> {
     const channel = await this.getChannel(channelSlug);
-    // KIK API typically returns chatroom info in the channel response
+    // KICK API typically returns chatroom info in the channel response
     // This is a placeholder - actual implementation may need different endpoint
     return channel.id;
   }
@@ -176,7 +176,7 @@ export class KickApiService {
   }
 }
 
-// Factory function to create KIK API service
+// Factory function to create KICK API service
 export function createKickApiService(
   accessToken: string,
   refreshToken: string,

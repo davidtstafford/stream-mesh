@@ -42,7 +42,7 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
   }
 }
 
-// KIK auth storage functions
+// KICK auth storage functions
 function saveKickAuth(auth: { username: string, accessToken: string, refreshToken: string, expiresAt: number }) {
   fs.writeFileSync(kickAuthFilePath, JSON.stringify(auth, null, 2), 'utf-8');
 }
@@ -244,13 +244,13 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Auto-connect to KIK if credentials exist
+  // Auto-connect to KICK if credentials exist
   const kickAuth = loadKickAuth();
   if (kickAuth) {
     try {
       // Check if token is expired and refresh if needed
       if (Date.now() >= kickAuth.expiresAt) {
-        console.log('KIK token expired, refreshing...');
+        console.log('KICK token expired, refreshing...');
         const refreshedTokens = await refreshKickToken(kickAuth.refreshToken);
         const updatedAuth = {
           username: kickAuth.username,
@@ -260,19 +260,19 @@ app.whenReady().then(async () => {
         };
         saveKickAuth(updatedAuth);
         await platformIntegrationService.connectKickWithOAuth(updatedAuth);
-        console.log('Auto-connected to KIK as', updatedAuth.username);
+        console.log('Auto-connected to KICK as', updatedAuth.username);
       } else {
         await platformIntegrationService.connectKickWithOAuth(kickAuth);
-        console.log('Auto-connected to KIK as', kickAuth.username);
+        console.log('Auto-connected to KICK as', kickAuth.username);
       }
     } catch (err) {
-      console.error('Failed to auto-connect to KIK:', err);
+      console.error('Failed to auto-connect to KICK:', err);
     }
   }
 
-  // Listen for KIK token refresh events to save updated tokens
+  // Listen for KICK token refresh events to save updated tokens
   platformIntegrationService.on('kick-token-refreshed', (newAuth) => {
-    console.log('KIK tokens refreshed, saving to storage...');
+    console.log('KICK tokens refreshed, saving to storage...');
     saveKickAuth(newAuth);
   });
 
@@ -462,20 +462,20 @@ app.whenReady().then(async () => {
     }
   });
 
-  // --- KIK OAuth IPC handlers ---
+  // --- KICK OAuth IPC handlers ---
   ipcMain.handle('kick:oauth', async (_event) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('No main window');
     try {
       const tokenResponse = await startKickOAuth(win);
-      console.log('KIK OAuth token response:', tokenResponse);
+      console.log('KICK OAuth token response:', tokenResponse);
       
       // Validate token and get user info
       const userInfo = await validateKickToken(tokenResponse.access_token);
-      console.log('KIK userInfo response:', userInfo);
+      console.log('KICK userInfo response:', userInfo);
       
       const username = userInfo.username || userInfo.login;
-      if (!username) throw new Error('Could not fetch KIK username');
+      if (!username) throw new Error('Could not fetch KICK username');
       
       // Prepare auth object
       const kickAuth = {
@@ -485,21 +485,21 @@ app.whenReady().then(async () => {
         expiresAt: Date.now() + (tokenResponse.expires_in * 1000)
       };
       
-      // Connect to KIK
+      // Connect to KICK
       await platformIntegrationService.connectKickWithOAuth(kickAuth);
       saveKickAuth(kickAuth);
       
       return { accessToken: tokenResponse.access_token, username };
     } catch (err) {
-      console.error('KIK OAuth error:', err);
+      console.error('KICK OAuth error:', err);
       throw err;
     }
   });
 
   ipcMain.handle('kick:connect', async (_event, username: string) => {
     try {
-      // For now, this is a placeholder - KIK uses OAuth only
-      throw new Error('KIK requires OAuth authentication. Use kick:oauth instead.');
+      // For now, this is a placeholder - KICK uses OAuth only
+      throw new Error('KICK requires OAuth authentication. Use kick:oauth instead.');
     } catch (err) {
       console.error('kick:connect error:', err);
       throw err;

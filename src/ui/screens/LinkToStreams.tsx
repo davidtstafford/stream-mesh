@@ -6,7 +6,7 @@ const LinkToStreams: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // KIK state
+  // KICK state
   const [kickUser, setKickUser] = useState("");
   const [kickConnected, setKickConnected] = useState(false);
   const [kickLoading, setKickLoading] = useState(false);
@@ -21,12 +21,12 @@ const LinkToStreams: React.FC = () => {
       setLoading(false);
     });
     
-    // Load KIK status
+    // Load KICK status
     window.electron.ipcRenderer.invoke("kick:status").then((status) => {
       setKickUser(status.username || "");
       setKickConnected(!!status.connected);
     }).catch((err) => {
-      console.error('Failed to load KIK status:', err);
+      console.error('Failed to load KICK status:', err);
     });
   }, []);
 
@@ -52,7 +52,7 @@ const LinkToStreams: React.FC = () => {
     setLoading(false);
   };
 
-  // KIK handlers
+  // KICK handlers
   const handleKickOAuthConnect = async () => {
     setKickLoading(true);
     try {
@@ -62,7 +62,7 @@ const LinkToStreams: React.FC = () => {
         setKickConnected(true);
       }
     } catch (err) {
-      alert("KIK authentication failed.");
+      alert("KICK authentication failed.");
     }
     setKickLoading(false);
   };
@@ -133,7 +133,7 @@ const LinkToStreams: React.FC = () => {
       </section>
 
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ color: "#53fc18", fontWeight: "bold" }}>KIK</h2>
+        <h2 style={{ color: "#53fc18", fontWeight: "bold" }}>KICK</h2>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             disabled={kickConnected || kickLoading}
@@ -178,7 +178,7 @@ const LinkToStreams: React.FC = () => {
               gap: 8,
             }}
           >
-            <span style={{ fontWeight: "bold" }}>✔</span> Connected to KIK as {kickUser}
+            <span style={{ fontWeight: "bold" }}>✔</span> Connected to KICK as {kickUser}
           </div>
         )}
       </section>

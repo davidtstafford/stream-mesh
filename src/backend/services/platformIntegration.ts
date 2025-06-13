@@ -207,15 +207,15 @@ class PlatformIntegrationService extends EventEmitter {
     return this.connections.twitch;
   }
 
-  // KIK connection methods
+  // KICK connection methods
   async connectKickWithOAuth(auth: KickAuth) {
     if (!auth.username || !auth.accessToken) {
-      throw new Error('Username and access token are required for KIK.');
+      throw new Error('Username and access token are required for KICK.');
     }
     
     this.kickAuth = auth;
     
-    // Create KIK API service with token refresh callback
+    // Create KICK API service with token refresh callback
     this.kickApiService = createKickApiService(
       auth.accessToken,
       auth.refreshToken,
@@ -236,14 +236,14 @@ class PlatformIntegrationService extends EventEmitter {
     this.connections.kick = { platform: 'kick', username: auth.username, connected: true };
     this.emit('status', this.connections.kick);
     
-    // TODO: Implement KIK WebSocket connection for real-time events
+    // TODO: Implement KICK WebSocket connection for real-time events
     // For Phase 3: Real-time Events implementation
     
     return this.connections.kick;
   }
 
   async disconnectKick() {
-    // TODO: Close KIK WebSocket connections when implemented
+    // TODO: Close KICK WebSocket connections when implemented
     this.kickAuth = null;
     this.kickApiService = null;
     this.connections.kick = { platform: 'kick', username: '', connected: false };
@@ -284,10 +284,10 @@ class PlatformIntegrationService extends EventEmitter {
       this.emit('chat', chatEvent);
     } else if (platform === 'kick') {
       if (!this.connections.kick.connected || !this.kickApiService) {
-        throw new Error('Not connected to KIK');
+        throw new Error('Not connected to KICK');
       }
       
-      // Send message using KIK API service
+      // Send message using KICK API service
       const channelSlug = this.connections.kick.username;
       await this.kickApiService.sendChatMessage(channelSlug, message);
       

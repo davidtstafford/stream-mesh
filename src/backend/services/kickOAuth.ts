@@ -1,4 +1,4 @@
-// KIK OAuth handler for Electron using Authorization Code + PKCE flow
+// KICK OAuth handler for Electron using Authorization Code + PKCE flow
 import { BrowserWindow } from 'electron';
 import * as http from 'http';
 import * as url from 'url';
@@ -26,7 +26,7 @@ export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResp
   return new Promise((resolve, reject) => {
     const { codeVerifier, codeChallenge } = generatePKCE();
     
-    // KIK OAuth URL with PKCE
+    // KICK OAuth URL with PKCE
     const OAUTH_URL = `https://kick.com/oauth2/authorize?` +
       `client_id=${CLIENT_ID}&` +
       `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
