@@ -293,7 +293,7 @@ class PlatformIntegrationService extends EventEmitter {
       
       // Emit a chat event for our own message so it appears in the UI
       const chatEvent = {
-        type: 'kick-chat' as const,
+        type: 'chat.message.sent' as const,
         platform: 'kick',
         channel: this.connections.kick.username,
         user: this.connections.kick.username,
