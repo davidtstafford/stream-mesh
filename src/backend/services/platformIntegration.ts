@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import tmi from 'tmi.js';
 import { eventBus } from './eventBus';
 
-export type Platform = 'twitch';
+export type Platform = 'twitch' | 'kick';
 
 export interface PlatformConnection {
   platform: Platform;
@@ -16,12 +16,21 @@ export interface TwitchAuth {
   accessToken: string;
 }
 
+export interface KickAuth {
+  username: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
 class PlatformIntegrationService extends EventEmitter {
   private connections: Record<Platform, PlatformConnection> = {
     twitch: { platform: 'twitch', username: '', connected: false },
+    kick: { platform: 'kick', username: '', connected: false },
   };
   private twitchClient: any = null;
   private twitchAuth: TwitchAuth | null = null;
+  private kickAuth: KickAuth | null = null;
 
   connectTwitch(username: string) {
     if (!username || typeof username !== 'string' || !username.trim()) {
@@ -195,6 +204,34 @@ class PlatformIntegrationService extends EventEmitter {
     return this.connections.twitch;
   }
 
+  // KIK connection methods
+  async connectKickWithOAuth(auth: KickAuth) {
+    if (!auth.username || !auth.accessToken) {
+      throw new Error('Username and access token are required for KIK.');
+    }
+    
+    this.kickAuth = auth;
+    this.connections.kick = { platform: 'kick', username: auth.username, connected: true };
+    this.emit('status', this.connections.kick);
+    
+    // TODO: Implement KIK WebSocket connection for real-time events
+    // For Phase 3: Real-time Events implementation
+    
+    return this.connections.kick;
+  }
+
+  async disconnectKick() {
+    // TODO: Close KIK WebSocket connections when implemented
+    this.kickAuth = null;
+    this.connections.kick = { platform: 'kick', username: '', connected: false };
+    this.emit('status', this.connections.kick);
+    return this.connections.kick;
+  }
+
+  getKickStatus() {
+    return this.connections.kick;
+  }
+
   // Send a chat message to the connected platform
   async sendChatMessage(message: string, platform: Platform = 'twitch', skipTTS: boolean = true): Promise<void> {
     if (platform === 'twitch') {
@@ -216,6 +253,30 @@ class PlatformIntegrationService extends EventEmitter {
         tags: {
           'user-id': 'bot',
           'display-name': this.connections.twitch.username,
+          'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
+        },
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(chatEvent);
+      this.emit('chat', chatEvent);
+    } else if (platform === 'kick') {
+      if (!this.connections.kick.connected || !this.kickAuth) {
+        throw new Error('Not connected to KIK');
+      }
+      
+      // TODO: Implement KIK chat message sending via API
+      // For Phase 2: Core Platform Integration
+      
+      // Emit a chat event for our own message so it appears in the UI
+      const chatEvent = {
+        type: 'chat' as const,
+        platform: 'kick',
+        channel: this.connections.kick.username,
+        user: this.connections.kick.username,
+        message,
+        tags: {
+          'user-id': 'bot',
+          'display-name': this.connections.kick.username,
           'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
         },
         time: new Date().toISOString(),

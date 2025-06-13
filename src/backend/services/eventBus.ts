@@ -3,7 +3,8 @@ import { EventEmitter } from 'events';
 
 // Unified event interface for all stream events
 export interface StreamEvent {
-  type: 'chat' | 'subscription' | 'resub' | 'subgift' | 'cheer' | 'hosted' | 'raided' | 'redeem';
+  type: 'chat' | 'subscription' | 'resub' | 'subgift' | 'cheer' | 'hosted' | 'raided' | 'redeem' | 
+        'kick-chat' | 'kick-follow' | 'kick-subscription' | 'kick-subgift' | 'kick-donation' | 'kick-raid' | 'kick-host';
   platform: string;
   channel: string;
   user: string;

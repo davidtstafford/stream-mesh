@@ -6,6 +6,7 @@ const isDev = require('electron-is-dev');
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth } from './backend/services/twitchOAuth';
+import { startKickOAuth, validateKickToken, refreshKickToken } from './backend/services/kickOAuth';
 import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
@@ -18,6 +19,7 @@ const express = require('express') as typeof import('express');
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
+const kickAuthFilePath = path.join(userDataPath, 'kickAuth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
@@ -34,6 +36,22 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
     const data = fs.readFileSync(authFilePath, 'utf-8');
     const auth = JSON.parse(data);
     if (auth && auth.username && auth.accessToken) return auth;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// KIK auth storage functions
+function saveKickAuth(auth: { username: string, accessToken: string, refreshToken: string, expiresAt: number }) {
+  fs.writeFileSync(kickAuthFilePath, JSON.stringify(auth, null, 2), 'utf-8');
+}
+
+function loadKickAuth(): { username: string, accessToken: string, refreshToken: string, expiresAt: number } | null {
+  try {
+    const data = fs.readFileSync(kickAuthFilePath, 'utf-8');
+    const auth = JSON.parse(data);
+    if (auth && auth.username && auth.accessToken && auth.refreshToken && auth.expiresAt) return auth;
     return null;
   } catch {
     return null;
@@ -226,6 +244,32 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Auto-connect to KIK if credentials exist
+  const kickAuth = loadKickAuth();
+  if (kickAuth) {
+    try {
+      // Check if token is expired and refresh if needed
+      if (Date.now() >= kickAuth.expiresAt) {
+        console.log('KIK token expired, refreshing...');
+        const refreshedTokens = await refreshKickToken(kickAuth.refreshToken);
+        const updatedAuth = {
+          username: kickAuth.username,
+          accessToken: refreshedTokens.access_token,
+          refreshToken: refreshedTokens.refresh_token,
+          expiresAt: Date.now() + (refreshedTokens.expires_in * 1000)
+        };
+        saveKickAuth(updatedAuth);
+        await platformIntegrationService.connectKickWithOAuth(updatedAuth);
+        console.log('Auto-connected to KIK as', updatedAuth.username);
+      } else {
+        await platformIntegrationService.connectKickWithOAuth(kickAuth);
+        console.log('Auto-connected to KIK as', kickAuth.username);
+      }
+    } catch (err) {
+      console.error('Failed to auto-connect to KIK:', err);
+    }
+  }
+
   // Register all IPC handlers (chat, twitch, etc.)
   // IPC handlers for chat messages
   ipcMain.handle('chat:insert', async (_event, msg) => {
@@ -408,6 +452,68 @@ app.whenReady().then(async () => {
       return { accessToken, username };
     } catch (err) {
       console.error('Twitch OAuth error:', err);
+      throw err;
+    }
+  });
+
+  // --- KIK OAuth IPC handlers ---
+  ipcMain.handle('kick:oauth', async (_event) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) throw new Error('No main window');
+    try {
+      const tokenResponse = await startKickOAuth(win);
+      console.log('KIK OAuth token response:', tokenResponse);
+      
+      // Validate token and get user info
+      const userInfo = await validateKickToken(tokenResponse.access_token);
+      console.log('KIK userInfo response:', userInfo);
+      
+      const username = userInfo.username || userInfo.login;
+      if (!username) throw new Error('Could not fetch KIK username');
+      
+      // Prepare auth object
+      const kickAuth = {
+        username,
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token,
+        expiresAt: Date.now() + (tokenResponse.expires_in * 1000)
+      };
+      
+      // Connect to KIK
+      await platformIntegrationService.connectKickWithOAuth(kickAuth);
+      saveKickAuth(kickAuth);
+      
+      return { accessToken: tokenResponse.access_token, username };
+    } catch (err) {
+      console.error('KIK OAuth error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:connect', async (_event, username: string) => {
+    try {
+      // For now, this is a placeholder - KIK uses OAuth only
+      throw new Error('KIK requires OAuth authentication. Use kick:oauth instead.');
+    } catch (err) {
+      console.error('kick:connect error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:disconnect', async () => {
+    try {
+      return platformIntegrationService.disconnectKick();
+    } catch (err) {
+      console.error('kick:disconnect error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:status', async () => {
+    try {
+      return platformIntegrationService.getKickStatus();
+    } catch (err) {
+      console.error('kick:status error:', err);
       throw err;
     }
   });
