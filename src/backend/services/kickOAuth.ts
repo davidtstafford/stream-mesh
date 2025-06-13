@@ -46,7 +46,60 @@ export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResp
         
         if (error) {
           res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end(`<html><body><h2>Authentication failed</h2><p>Error: ${error}</p><script>window.close();</script></body></html>`);
+          res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <title>KICK Authentication Failed</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      background: #0a0a0a; 
+      color: white; 
+      padding: 40px; 
+      margin: 0;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 30px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #f53838;
+    }
+    h2 { color: #f53838; margin-bottom: 20px; }
+    p { margin-bottom: 30px; line-height: 1.5; }
+    .error { color: #ff6b6b; font-weight: bold; }
+    button {
+      background: #53fc18;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    button:hover { background: #45d614; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>❌ Authentication Failed</h2>
+    <p>There was an error with KICK authentication:</p>
+    <p class="error">${error}</p>
+    <p>Please close this window and try again.</p>
+    <button onclick="window.close()">Close Window</button>
+  </div>
+  <script>
+    setTimeout(() => {
+      try { window.close(); } catch(e) { 
+        document.body.innerHTML = '<div class="container"><h2>Please close this window manually</h2></div>'; 
+      }
+    }, 5000);
+  </script>
+</body>
+</html>`);
           reject(new Error(`OAuth error: ${error}`));
           server.close();
           return;
@@ -58,13 +111,115 @@ export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResp
             const tokenResponse = await exchangeCodeForToken(code, codeVerifier);
             
             res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(`<html><body><h2>Authentication complete</h2><p>You may now close this window and return to StreamMesh.</p><script>window.close();</script></body></html>`);
+            res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <title>KICK Authentication Complete</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      background: #0a0a0a; 
+      color: white; 
+      padding: 40px; 
+      margin: 0;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 30px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #53fc18;
+    }
+    h2 { color: #53fc18; margin-bottom: 20px; }
+    p { margin-bottom: 30px; line-height: 1.5; }
+    button {
+      background: #53fc18;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    button:hover { background: #45d614; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>✅ Authentication Complete</h2>
+    <p>KICK authentication was successful! You can now close this window and return to Stream Mesh.</p>
+    <button onclick="window.close()">Close Window</button>
+  </div>
+  <script>
+    // Auto-close after 3 seconds if manual close doesn't work
+    setTimeout(() => {
+      try { window.close(); } catch(e) { 
+        document.body.innerHTML = '<div class="container"><h2>Please close this window manually</h2></div>'; 
+      }
+    }, 3000);
+  </script>
+</body>
+</html>`);
             
             resolve(tokenResponse);
             server.close();
           } catch (error) {
             res.writeHead(500, { 'Content-Type': 'text/html' });
-            res.end(`<html><body><h2>Authentication failed</h2><p>Failed to exchange code for token</p><script>window.close();</script></body></html>`);
+            res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <title>KICK Authentication Failed</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      background: #0a0a0a; 
+      color: white; 
+      padding: 40px; 
+      margin: 0;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 30px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #f53838;
+    }
+    h2 { color: #f53838; margin-bottom: 20px; }
+    p { margin-bottom: 30px; line-height: 1.5; }
+    button {
+      background: #53fc18;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    button:hover { background: #45d614; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>❌ Authentication Failed</h2>
+    <p>Failed to exchange authorization code for access token.</p>
+    <p>Please close this window and try again.</p>
+    <button onclick="window.close()">Close Window</button>
+  </div>
+  <script>
+    setTimeout(() => {
+      try { window.close(); } catch(e) { 
+        document.body.innerHTML = '<div class="container"><h2>Please close this window manually</h2></div>'; 
+      }
+    }, 5000);
+  </script>
+</body>
+</html>`);
             reject(error);
             server.close();
           }
@@ -85,8 +240,15 @@ export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResp
           contextIsolation: true,
         },
         parent: mainWindow,
-        modal: true,
+        modal: false,  // Remove modal to allow close button
         show: true,
+        title: 'KICK Authentication',
+        minimizable: false,
+        maximizable: false,
+        resizable: false,
+        alwaysOnTop: true,
+        closable: true,  // Explicitly enable close button
+        autoHideMenuBar: true,  // Hide menu bar for cleaner look
       });
       
       authWin.loadURL(OAUTH_URL);

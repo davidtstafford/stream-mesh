@@ -16,7 +16,58 @@ export function startTwitchOAuth(mainWindow: BrowserWindow): Promise<string> {
       if (reqUrl.pathname === '/auth/twitch/callback') {
         // The access token is in the URL fragment, not query, so we need to instruct the user to copy it
         res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(`<html><body><h2>Authentication complete</h2><p>You may now close this window and return to StreamMesh.</p><script>window.close();</script></body></html>`);
+        res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Twitch Authentication Complete</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      background: #0f0f23; 
+      color: white; 
+      padding: 40px; 
+      margin: 0;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 30px;
+      background: #18181b;
+      border-radius: 8px;
+      border: 2px solid #9147ff;
+    }
+    h2 { color: #9147ff; margin-bottom: 20px; }
+    p { margin-bottom: 30px; line-height: 1.5; }
+    button {
+      background: #9147ff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    button:hover { background: #772ce8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>✅ Authentication Complete</h2>
+    <p>Twitch authentication was successful! You can now close this window and return to Stream Mesh.</p>
+    <button onclick="window.close()">Close Window</button>
+  </div>
+  <script>
+    // Auto-close after 3 seconds if manual close doesn't work
+    setTimeout(() => {
+      try { window.close(); } catch(e) { 
+        document.body.innerHTML = '<div class="container"><h2>Please close this window manually</h2></div>'; 
+      }
+    }, 3000);
+  </script>
+</body>
+</html>`);
         // We can't get the fragment from the server, so we need to get it from the browser window
         // We'll use a custom protocol in the Electron window to intercept it
       } else {
@@ -35,8 +86,15 @@ export function startTwitchOAuth(mainWindow: BrowserWindow): Promise<string> {
         contextIsolation: true,
       },
       parent: mainWindow,
-      modal: true,
+      modal: false,  // Remove modal to allow close button
       show: true,
+      title: 'Twitch Authentication',
+      minimizable: false,
+      maximizable: false,
+      resizable: false,
+      alwaysOnTop: true,
+      closable: true,  // Explicitly enable close button
+      autoHideMenuBar: true,  // Hide menu bar for cleaner look
     });
     authWin.loadURL(OAUTH_URL);
 
