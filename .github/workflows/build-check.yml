@@ -17,6 +17,41 @@ jobs:
       id: check
       run: echo "safe=true" >> $GITHUB_OUTPUT
 
+  version-check:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository || contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Check version bump
+      run: |
+        # Get current version from package.json
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "Current package.json version: $CURRENT_VERSION"
+        
+        # Get latest release tag (exclude pre-release tags)
+        LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 | sed 's/^v//' || echo "0.0.0")
+        echo "Latest release tag: $LATEST_TAG"
+        
+        # Simple version comparison
+        if [ "$CURRENT_VERSION" = "$LATEST_TAG" ]; then
+          echo "❌ Version $CURRENT_VERSION matches the latest release tag v$LATEST_TAG"
+          echo "Please bump the version in package.json before merging this PR"
+          echo "Suggested versions: $(node -e "
+            const [major, minor, patch] = '$CURRENT_VERSION'.split('.').map(Number);
+            console.log(\`\${major}.\${minor}.\${patch + 1} (patch), \${major}.\${minor + 1}.0 (minor), \${major + 1}.0.0 (major)\`);
+          ")"
+          exit 1
+        else
+          echo "✅ Version has been updated from $LATEST_TAG to $CURRENT_VERSION"
+        fi
+
   build-intel:
     needs: security-check
     runs-on: macos-13  # Intel Mac
