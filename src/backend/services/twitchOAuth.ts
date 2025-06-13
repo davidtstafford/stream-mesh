@@ -1,12 +1,47 @@
 // Twitch OAuth handler for Electron
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, shell, session } from 'electron';
 import * as http from 'http';
 import * as url from 'url';
 
 const CLIENT_ID = 'cboarqiyyeps1ew3f630aimpj6d8wf';
 const OAUTH_PORT = 3300;
 const REDIRECT_URI = `http://localhost:${OAUTH_PORT}/auth/twitch/callback`;
-const OAUTH_URL = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=chat:read+chat:edit`;
+const OAUTH_URL = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=chat:read+chat:edit&force_verify=true`;
+
+// Clear Twitch session data
+export function clearTwitchSession(): Promise<void> {
+  return new Promise((resolve) => {
+    const defaultSession = session.defaultSession;
+    const twitchSession = session.fromPartition('persist:twitch-oauth');
+    
+    // Clear both default session and twitch-oauth partition
+    Promise.all([
+      // Clear default session
+      defaultSession.clearStorageData({
+        storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+        quotas: ['temporary'],
+        origin: 'https://id.twitch.tv'
+      }).then(() => {
+        return defaultSession.clearStorageData({
+          storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+          quotas: ['temporary'],
+          origin: 'https://twitch.tv'
+        });
+      }),
+      // Clear twitch-oauth partition completely
+      twitchSession.clearStorageData({
+        storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+        quotas: ['temporary']
+      })
+    ]).then(() => {
+      console.log('Twitch session data cleared (both default and oauth partition)');
+      resolve();
+    }).catch((err) => {
+      console.error('Failed to clear Twitch session data:', err);
+      resolve(); // Don't fail the disconnect process
+    });
+  });
+}
 
 export function startTwitchOAuth(mainWindow: BrowserWindow): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -84,6 +119,7 @@ export function startTwitchOAuth(mainWindow: BrowserWindow): Promise<string> {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        partition: 'persist:twitch-oauth', // Use separate session partition
       },
       parent: mainWindow,
       modal: false,  // Remove modal to allow close button

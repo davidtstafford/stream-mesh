@@ -5,8 +5,8 @@ import * as path from 'path';
 const isDev = require('electron-is-dev');
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
-import { startTwitchOAuth } from './backend/services/twitchOAuth';
-import { startKickOAuth, validateKickToken, refreshKickToken } from './backend/services/kickOAuth';
+import { startTwitchOAuth, clearTwitchSession } from './backend/services/twitchOAuth';
+import { startKickOAuth, validateKickToken, refreshKickToken, clearKickSession } from './backend/services/kickOAuth';
 import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
@@ -55,6 +55,29 @@ function loadKickAuth(): { username: string, accessToken: string, refreshToken: 
     return null;
   } catch {
     return null;
+  }
+}
+
+// Auth deletion functions
+function deleteTwitchAuth(): void {
+  try {
+    if (fs.existsSync(authFilePath)) {
+      fs.unlinkSync(authFilePath);
+      console.log('Twitch auth file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete Twitch auth file:', err);
+  }
+}
+
+function deleteKickAuth(): void {
+  try {
+    if (fs.existsSync(kickAuthFilePath)) {
+      fs.unlinkSync(kickAuthFilePath);
+      console.log('KICK auth file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete KICK auth file:', err);
   }
 }
 
@@ -419,7 +442,10 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('twitch:disconnect', async () => {
     try {
-      return platformIntegrationService.disconnectTwitch();
+      const result = platformIntegrationService.disconnectTwitch();
+      deleteTwitchAuth(); // Delete stored auth file
+      await clearTwitchSession(); // Clear browser session data
+      return result;
     } catch (err) {
       console.error('twitch:disconnect error:', err);
       throw err;
@@ -508,7 +534,10 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('kick:disconnect', async () => {
     try {
-      return platformIntegrationService.disconnectKick();
+      const result = platformIntegrationService.disconnectKick();
+      deleteKickAuth(); // Delete stored auth file
+      await clearKickSession(); // Clear browser session data
+      return result;
     } catch (err) {
       console.error('kick:disconnect error:', err);
       throw err;

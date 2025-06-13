@@ -1,5 +1,5 @@
 // KICK OAuth handler for Electron using Authorization Code + PKCE flow
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, session } from 'electron';
 import * as http from 'http';
 import * as url from 'url';
 import * as crypto from 'crypto';
@@ -20,6 +20,35 @@ export interface KickTokenResponse {
   refresh_token: string;
   token_type: string;
   expires_in: number;
+}
+
+// Clear KICK session data
+export function clearKickSession(): Promise<void> {
+  return new Promise((resolve) => {
+    const defaultSession = session.defaultSession;
+    const kickSession = session.fromPartition('persist:kick-oauth');
+    
+    // Clear both default session and kick-oauth partition
+    Promise.all([
+      // Clear default session
+      defaultSession.clearStorageData({
+        storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+        quotas: ['temporary'],
+        origin: 'https://kick.com'
+      }),
+      // Clear kick-oauth partition completely
+      kickSession.clearStorageData({
+        storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+        quotas: ['temporary']
+      })
+    ]).then(() => {
+      console.log('KICK session data cleared (both default and oauth partition)');
+      resolve();
+    }).catch((err) => {
+      console.error('Failed to clear KICK session data:', err);
+      resolve(); // Don't fail the disconnect process
+    });
+  });
 }
 
 export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResponse> {
@@ -238,6 +267,7 @@ export function startKickOAuth(mainWindow: BrowserWindow): Promise<KickTokenResp
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
+          partition: 'persist:kick-oauth', // Use separate session partition
         },
         parent: mainWindow,
         modal: false,  // Remove modal to allow close button
