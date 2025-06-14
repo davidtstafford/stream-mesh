@@ -3,7 +3,6 @@ import PollyConfigSection from './TTS/PollyConfigSection';
 import TTSSettingsSection from './TTS/TTSSettingsSection';
 import { useTTSSettings } from './TTS/hooks/useTTSSettings';
 import TTSVoiceSelector, { PollyVoiceSorted } from './TTS/TTSVoiceSelector';
-import TTSHelpModal from './TTS/TTSHelpModal';
 import TTSQueueManager from './TTS/TTSQueueManager';
 import TTSTestAllVoicesSection from './TTS/TTSTestAllVoicesSection';
 import { usePollyConfig } from './TTS/hooks/usePollyConfig';
@@ -43,7 +42,6 @@ const TTS: React.FC = () => {
 
   // Get disableNeuralVoices from TTS settings
   const { disableNeuralVoices } = useTTSSettings();
-  const [showHelp, setShowHelp] = useState(false);
   const [skipLargeNumbers, setSkipLargeNumbers] = useState(false);
   const [testAllOutput, setTestAllOutput] = useState('');
   const [testAllLoading, setTestAllLoading] = useState(false);
@@ -175,13 +173,8 @@ const TTS: React.FC = () => {
 
   return (
     <div style={{ ...getResponsiveContainerStyle(600), color: '#fff' }}>
-      {/* Help Modal */}
-      <TTSHelpModal showHelp={showHelp} onClose={() => setShowHelp(false)} />
-      
       {/* Amazon Polly (Cloud TTS) - REQUIRED section */}
-      <PollyConfigSection
-        onHelp={() => setShowHelp(true)}
-      />
+      <PollyConfigSection />
       
       {/* Status Message */}
       {ttsStatus && (
