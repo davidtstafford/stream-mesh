@@ -23,6 +23,7 @@ const kickAuthFilePath = path.join(userDataPath, 'kickAuth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
+const kickCredentialsFilePath = path.join(userDataPath, 'kickCredentials.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -55,6 +56,33 @@ function loadKickAuth(): { username: string, accessToken: string, refreshToken: 
     return null;
   } catch {
     return null;
+  }
+}
+
+// KICK credentials storage functions (for user-provided client_id and client_secret)
+function saveKickCredentials(credentials: { client_id: string, client_secret: string }) {
+  fs.writeFileSync(kickCredentialsFilePath, JSON.stringify(credentials, null, 2), 'utf-8');
+}
+
+function loadKickCredentials(): { client_id: string, client_secret: string } | null {
+  try {
+    const data = fs.readFileSync(kickCredentialsFilePath, 'utf-8');
+    const credentials = JSON.parse(data);
+    if (credentials && credentials.client_id && credentials.client_secret) return credentials;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function deleteKickCredentials(): void {
+  try {
+    if (fs.existsSync(kickCredentialsFilePath)) {
+      fs.unlinkSync(kickCredentialsFilePath);
+      console.log('KICK credentials file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete KICK credentials file:', err);
   }
 }
 
@@ -270,11 +298,16 @@ app.whenReady().then(async () => {
   // Auto-connect to KICK if credentials exist
   const kickAuth = loadKickAuth();
   if (kickAuth) {
-    try {
-      // Check if token is expired and refresh if needed
-      if (Date.now() >= kickAuth.expiresAt) {
-        console.log('KICK token expired, refreshing...');
-        const refreshedTokens = await refreshKickToken(kickAuth.refreshToken);
+    // Load credentials for token refresh
+    const kickCredentials = loadKickCredentials();
+    if (!kickCredentials) {
+      console.log('KICK credentials not found, skipping auto-connect');
+    } else {
+      try {
+        // Check if token is expired and refresh if needed
+        if (Date.now() >= kickAuth.expiresAt) {
+          console.log('KICK token expired, refreshing...');
+          const refreshedTokens = await refreshKickToken(kickAuth.refreshToken, kickCredentials);
         const updatedAuth = {
           username: kickAuth.username,
           accessToken: refreshedTokens.access_token,
@@ -288,8 +321,9 @@ app.whenReady().then(async () => {
         await platformIntegrationService.connectKickWithOAuth(kickAuth);
         console.log('Auto-connected to KICK as', kickAuth.username);
       }
-    } catch (err) {
-      console.error('Failed to auto-connect to KICK:', err);
+      } catch (err) {
+        console.error('Failed to auto-connect to KICK:', err);
+      }
     }
   }
 
@@ -492,16 +526,31 @@ app.whenReady().then(async () => {
   ipcMain.handle('kick:oauth', async (_event) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('No main window');
+    
+    // Load user-provided credentials
+    const credentials = loadKickCredentials();
+    if (!credentials) {
+      throw new Error('KICK credentials not found. Please save your Client ID and Client Secret first.');
+    }
+    
     try {
-      const tokenResponse = await startKickOAuth(win);
+      const tokenResponse = await startKickOAuth(win, credentials);
       console.log('KICK OAuth token response:', tokenResponse);
       
       // Validate token and get user info
       const userInfo = await validateKickToken(tokenResponse.access_token);
       console.log('KICK userInfo response:', userInfo);
       
-      const username = userInfo.username || userInfo.login;
-      if (!username) throw new Error('Could not fetch KICK username');
+      // Extract username from channels API response
+      let username: string;
+      if (userInfo.data && Array.isArray(userInfo.data) && userInfo.data.length > 0) {
+        const lastChannel = userInfo.data[userInfo.data.length - 1];
+        username = lastChannel.slug || lastChannel.broadcaster_username;
+      } else {
+        username = userInfo.username || userInfo.login || userInfo.slug;
+      }
+      
+      if (!username) throw new Error('Could not fetch KICK username from API response');
       
       // Prepare auth object
       const kickAuth = {
@@ -789,6 +838,16 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Register IPC handler to open external URLs
+  ipcMain.handle('open-external-url', async (_event, url: string) => {
+    try {
+      await shell.openExternal(url);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  });
+
   // IPC handlers for viewers moderation system
   ipcMain.handle('fetchViewers', async () => {
     return new Promise((resolve, reject) => {
@@ -1029,3 +1088,34 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// --- KICK Credentials IPC handlers ---
+  ipcMain.handle('kick:saveCredentials', async (_event, credentials: { client_id: string, client_secret: string }) => {
+    try {
+      saveKickCredentials(credentials);
+      return { success: true };
+    } catch (err) {
+      console.error('kick:saveCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:loadCredentials', async () => {
+    try {
+      const credentials = loadKickCredentials();
+      return credentials || null;
+    } catch (err) {
+      console.error('kick:loadCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:deleteCredentials', async () => {
+    try {
+      deleteKickCredentials();
+      return { success: true };
+    } catch (err) {
+      console.error('kick:deleteCredentials error:', err);
+      throw err;
+    }
+  });
