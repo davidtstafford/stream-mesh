@@ -493,6 +493,21 @@ app.whenReady().then(async () => {
     }
   });
 
+  // KICK Developer simulation handler (alias for triggerEvent)
+  ipcMain.handle('developer:simulateEvent', async (_event, eventData) => {
+    try {
+      console.log('Developer: Simulating KICK event:', eventData);
+      
+      // Send the event through the eventBus using the correct method
+      eventBus.emitEvent(eventData);
+      
+      return { success: true, message: `Simulated ${eventData.type} event successfully` };
+    } catch (err) {
+      console.error('developer:simulateEvent error:', err);
+      throw err;
+    }
+  });
+
   // Twitch connection IPC handlers with error logging
   ipcMain.handle('twitch:connect', async (_event, username: string) => {
     try {
