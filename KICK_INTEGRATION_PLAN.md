@@ -167,26 +167,28 @@ Integrate KICK streaming platform support alongside existing Twitch integration,
 ## Phase 5: Command System Integration 💬
 
 ### 5.1 Cross-Platform Commands
-- [ ] Update `CommandProcessor` to handle KICK platform
-- [ ] Test system commands work on KICK (`~voices`, `~setvoice`, etc.)
-- [ ] Implement KICK chat message sending
-- [ ] Test command permissions with KICK users
+- [x] Update `CommandProcessor` to handle KICK platform
+- [x] Test system commands work on KICK (`~voices`, `~setvoice`, etc.)
+- [x] Implement KICK chat message sending
+- [x] Test command permissions with KICK users
 
 ### 5.2 Viewer Management
-- [ ] Test KICK viewers appear in Viewers screen
-- [ ] Verify viewer settings work for KICK users
-- [ ] Test TTS voice settings for KICK viewers
-- [ ] Test role assignment for KICK users
+- [x] Test KICK viewers appear in Viewers screen
+- [x] Verify viewer settings work for KICK users
+- [x] Test TTS voice settings for KICK viewers
+- [x] Test role assignment for KICK users
 
 ### 5.3 Permission System
-- [ ] Map KICK user roles to Stream Mesh permissions
-- [ ] Test moderator commands from KICK
-- [ ] Verify permission checking works across platforms
-- [ ] Test cross-platform command responses
+- [x] Map KICK user roles to Stream Mesh permissions
+- [x] Test moderator commands from KICK
+- [x] Verify permission checking works across platforms
+- [x] Test cross-platform command responses
 
 **Files to Modify:**
-- `src/backend/services/commandProcessor.ts`
-- `src/ui/screens/Viewers.tsx`
+- `src/backend/services/commandProcessor.ts` ✅
+- `src/backend/services/eventBus.ts` ✅
+- `src/ui/screens/Viewers.tsx` ✅
+- `src/backend/services/kickWebSocket.ts` ✅
 - `src/ui/screens/SystemCommands.tsx`
 
 ---

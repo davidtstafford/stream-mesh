@@ -51,7 +51,9 @@ const defaultPlatformConfigs: PlatformEventConfigs[] = [
     events: [
       { type: 'channel.followed', enabled: true, showInEvents: true, color: '#00cc66', displayName: 'New Followers' },
       { type: 'channel.subscription.new', enabled: true, showInEvents: true, color: '#ff3366', displayName: 'New Subscriptions' },
-      { type: 'raided', enabled: true, showInEvents: true, color: '#ff4500', displayName: 'Raids' },
+      { type: 'channel.subscription.renewal', enabled: true, showInEvents: true, color: '#ff6699', displayName: 'Subscription Renewals' },
+      { type: 'channel.subscription.gifts', enabled: true, showInEvents: true, color: '#ff99cc', displayName: 'Gifted Subscriptions' },
+      { type: 'moderation.banned', enabled: true, showInEvents: true, color: '#ff0000', displayName: 'User Bans' },
     ]
   }
 ];

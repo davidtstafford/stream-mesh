@@ -1,6 +1,35 @@
 // KICK WebSocket service for real-time events
 import { EventEmitter } from 'events';
+import WebSocket from 'ws';
 import { eventBus } from './eventBus';
+
+// Map KICK user badges to Stream Mesh permission levels
+function mapKickRoleToPermission(badges: Array<{ type: string; text: string; count?: number }>): string {
+  if (!badges || badges.length === 0) return 'viewer';
+  
+  // Check for KICK-specific roles in order of priority
+  for (const badge of badges) {
+    switch (badge.type?.toLowerCase()) {
+      case 'broadcaster':
+      case 'owner':
+        return 'super_moderator';
+      case 'moderator':
+      case 'mod':
+        return 'moderator';
+      case 'vip':
+        return 'moderator'; // VIPs get mod privileges in Stream Mesh
+      case 'og':
+      case 'founder':
+      case 'subscriber':
+      case 'sub':
+        return 'viewer'; // Subscribers are still viewers for command purposes
+      default:
+        continue;
+    }
+  }
+  
+  return 'viewer';
+}
 
 interface KickWebSocketConfig {
   channelId: string;
@@ -84,7 +113,7 @@ class KickWebSocketService extends EventEmitter {
       
       this.ws = new WebSocket(wsUrl);
       
-      this.ws.onopen = () => {
+      this.ws.on('open', () => {
         console.log('[KickWebSocket] Connected to Pusher');
         this.connected = true;
         this.reconnectAttempts = 0;
@@ -94,14 +123,14 @@ class KickWebSocketService extends EventEmitter {
         this.subscribeToChannelEvents(chatroomId, config.channelId);
         
         this.emit('connected');
-      };
+      });
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
-      };
+      this.ws.on('message', (data) => {
+        this.handleMessage(data.toString());
+      });
 
-      this.ws.onclose = (event) => {
-        console.log('[KickWebSocket] Connection closed:', event.code, event.reason);
+      this.ws.on('close', (code, reason) => {
+        console.log('[KickWebSocket] Connection closed:', code, reason || 'No reason provided');
         this.connected = false;
         this.stopHeartbeat();
         
@@ -110,12 +139,12 @@ class KickWebSocketService extends EventEmitter {
         }
         
         this.emit('disconnected');
-      };
+      });
 
-      this.ws.onerror = (error) => {
+      this.ws.on('error', (error) => {
         console.error('[KickWebSocket] Connection error:', error);
         this.emit('error', error);
-      };
+      });
 
     } catch (error) {
       console.error('[KickWebSocket] Failed to connect:', error);
@@ -132,7 +161,7 @@ class KickWebSocketService extends EventEmitter {
   }
 
   private subscribeToChannelEvents(chatroomId: number, channelId: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== 1) { // WebSocket.OPEN = 1
       console.error('[KickWebSocket] Cannot subscribe - WebSocket not connected');
       return;
     }
@@ -147,7 +176,7 @@ class KickWebSocketService extends EventEmitter {
   }
 
   private subscribe(channel: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== 1) return; // WebSocket.OPEN = 1
 
     const subscribeMessage = {
       event: 'pusher:subscribe',
@@ -223,6 +252,10 @@ class KickWebSocketService extends EventEmitter {
     // Skip bot messages
     if (data.type === 'bot') return;
 
+    // Map KICK user role to Stream Mesh permissions
+    const badges = data.sender.identity?.badges || [];
+    const role = mapKickRoleToPermission(badges);
+
     const streamEvent = {
       type: 'chat' as const,
       platform: 'kick' as const,
@@ -235,7 +268,8 @@ class KickWebSocketService extends EventEmitter {
         'message-id': data.id,
         'chatroom-id': data.chatroom_id.toString(),
         'color': data.sender.identity?.color || '#FFFFFF',
-        'badges': JSON.stringify(data.sender.identity?.badges || [])
+        'badges': JSON.stringify(badges),
+        'role': role // Add role for permission checking
       }
     };
 
@@ -302,7 +336,7 @@ class KickWebSocketService extends EventEmitter {
 
   private startHeartbeat(): void {
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (this.ws && this.ws.readyState === 1) { // WebSocket.OPEN = 1
         this.ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
       }
     }, 30000); // Ping every 30 seconds
@@ -348,17 +382,17 @@ class KickWebSocketService extends EventEmitter {
   }
 
   isConnected(): boolean {
-    return this.connected && this.ws?.readyState === WebSocket.OPEN;
+    return this.connected && this.ws?.readyState === 1; // WebSocket.OPEN = 1
   }
 
   getConnectionState(): string {
     if (!this.ws) return 'disconnected';
     
     switch (this.ws.readyState) {
-      case WebSocket.CONNECTING: return 'connecting';
-      case WebSocket.OPEN: return 'connected';
-      case WebSocket.CLOSING: return 'closing';
-      case WebSocket.CLOSED: return 'disconnected';
+      case 0: return 'connecting'; // WebSocket.CONNECTING = 0
+      case 1: return 'connected';  // WebSocket.OPEN = 1
+      case 2: return 'closing';    // WebSocket.CLOSING = 2
+      case 3: return 'disconnected'; // WebSocket.CLOSED = 3
       default: return 'unknown';
     }
   }

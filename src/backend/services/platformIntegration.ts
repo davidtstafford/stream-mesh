@@ -71,7 +71,7 @@ class PlatformIntegrationService extends EventEmitter {
       if (!self) {
         const chatEvent = {
           type: 'chat' as const,
-          platform: 'twitch',
+          platform: 'twitch' as const,
           channel,
           user: tags['display-name'] || tags.username,
           message,
@@ -87,7 +87,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('subscription', (channel: string, username: string, method: any, message: string, tags: any) => {
       const subscriptionEvent = {
         type: 'subscription' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: message || undefined,
@@ -104,7 +104,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('resub', (channel: string, username: string, months: number, message: string, tags: any, method: any) => {
       const resubEvent = {
         type: 'resub' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: message || undefined,
@@ -121,7 +121,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('subgift', (channel: string, username: string, streakMonths: number, recipient: string, method: any, tags: any) => {
       const subgiftEvent = {
         type: 'subgift' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -138,7 +138,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('cheer', (channel: string, tags: any, message: string) => {
       const cheerEvent = {
         type: 'cheer' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: tags['display-name'] || tags.username,
         message: message || undefined,
@@ -155,7 +155,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('hosted', (channel: string, username: string, viewers: number, autohost: boolean) => {
       const hostedEvent = {
         type: 'hosted' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -172,7 +172,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('raided', (channel: string, username: string, viewers: number) => {
       const raidedEvent = {
         type: 'raided' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -295,7 +295,7 @@ class PlatformIntegrationService extends EventEmitter {
       // Emit a chat event for our own message so it appears in the UI
       const chatEvent = {
         type: 'chat' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: this.connections.twitch.username,
         message,
@@ -320,7 +320,7 @@ class PlatformIntegrationService extends EventEmitter {
       // Emit a chat event for our own message so it appears in the UI
       const chatEvent = {
         type: 'chat.message.sent' as const,
-        platform: 'kick',
+        platform: 'kick' as const,
         channel: this.connections.kick.username,
         user: this.connections.kick.username,
         message,
@@ -347,7 +347,7 @@ class PlatformIntegrationService extends EventEmitter {
 
     const redeemEvent = {
       type: 'redeem' as const,
-      platform: 'twitch',
+      platform: 'twitch' as const,
       channel: this.connections.twitch.username,
       user: username,
       message: userInput || undefined,

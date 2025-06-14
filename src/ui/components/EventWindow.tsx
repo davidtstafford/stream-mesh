@@ -38,7 +38,7 @@ const platformGroups: PlatformEventGroup[] = [
   {
     platform: 'kick',
     displayName: 'KICK',
-    types: ['channel.followed', 'channel.subscription.new', 'raided']
+    types: ['channel.followed', 'channel.subscription.new', 'channel.subscription.renewal', 'channel.subscription.gifts', 'moderation.banned']
   }
 ];
 
@@ -53,6 +53,9 @@ const defaultConfigs: Record<string, EventDisplayConfig> = {
   redeem: { enabled: true, color: '#00ff88', displayName: 'Channel Point Redemptions' },
   'channel.followed': { enabled: true, color: '#00cc66', displayName: 'New Followers' },
   'channel.subscription.new': { enabled: true, color: '#ff3366', displayName: 'New Subscriptions' },
+  'channel.subscription.renewal': { enabled: true, color: '#ff6699', displayName: 'Subscription Renewals' },
+  'channel.subscription.gifts': { enabled: true, color: '#ff99cc', displayName: 'Gifted Subscriptions' },
+  'moderation.banned': { enabled: true, color: '#ff0000', displayName: 'User Bans' },
 };
 
 interface EventWindowProps {
@@ -339,6 +342,29 @@ const EventWindow: React.FC<EventWindowProps> = ({ windowId, initialConfig, isSt
         return (
           <div style={{ color: config.color }}>
             <strong>🎉 {event.user}</strong> subscribed ({subTier}, {subMonths} months)!
+          </div>
+        );
+      case 'channel.subscription.renewal':
+        const renewalMonths = event.amount || 1;
+        const renewalTier = event.tags?.tier || 'Tier 1';
+        return (
+          <div style={{ color: config.color }}>
+            <strong>🔄 {event.user}</strong> renewed subscription ({renewalTier}, {renewalMonths} months)!
+          </div>
+        );
+      case 'channel.subscription.gifts':
+        const giftRecipient = event.tags?.recipient || 'someone';
+        const giftTier = event.tags?.tier || 'Tier 1';
+        return (
+          <div style={{ color: config.color }}>
+            <strong>🎁 {event.user}</strong> gifted a {giftTier} subscription to {giftRecipient}!
+          </div>
+        );
+      case 'moderation.banned':
+        const reason = event.message || 'No reason provided';
+        return (
+          <div style={{ color: config.color }}>
+            <strong>🚫 {event.user}</strong> was banned - {reason}
           </div>
         );
       default:

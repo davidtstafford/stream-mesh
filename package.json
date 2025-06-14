@@ -30,6 +30,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.15.21",
     "@types/webpack-env": "^1.18.8",
+    "@types/ws": "^8.18.1",
     "babel-loader": "^10.0.0",
     "buffer": "^6.0.3",
     "concurrently": "^9.1.2",
@@ -58,7 +59,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sqlite3": "^5.1.7",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "ws": "^8.18.2"
   },
   "build": {
     "appId": "com.streammesh.app",

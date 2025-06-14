@@ -220,7 +220,19 @@ const Viewers: React.FC = () => {
               <tr key={viewer.id}>
                 <td style={{ padding: 8 }}>{viewer.name}</td>
                 <td style={{ padding: 8 }}>{viewer.id}</td>
-                <td style={{ padding: 8 }}>{viewer.platform}</td>
+                <td style={{ padding: 8 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    backgroundColor: viewer.platform === 'kick' ? '#53fc18' : '#9147ff',
+                    color: viewer.platform === 'kick' ? '#000' : '#fff'
+                  }}>
+                    {viewer.platform === 'kick' ? '🥊 KICK' : '🟣 Twitch'}
+                  </span>
+                </td>
                 <td style={{ padding: 8 }}>{viewer.lastActive}</td>
                 <td style={{ padding: 8 }}>
                   <button

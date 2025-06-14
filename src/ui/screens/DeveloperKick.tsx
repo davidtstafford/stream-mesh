@@ -86,28 +86,81 @@ const DeveloperKick: React.FC = () => {
     }
   };
 
-  // Simulate a raid event
-  const simulateRaid = async () => {
+  // Simulate a subscription renewal event
+  const simulateSubscriptionRenewal = async () => {
     const event = {
-      type: 'raided',
+      type: 'channel.subscription.renewal',
       platform: 'kick',
       channel: 'testchannel',
       user: customData.username,
-      amount: customData.viewerCount,
+      amount: customData.months,
       time: new Date().toISOString(),
       tags: {
-        'viewer-count': customData.viewerCount.toString(),
-        'host-channel': customData.username
+        'user-id': Math.floor(Math.random() * 100000).toString(),
+        'channel-id': customData.channelId,
+        'months': customData.months.toString(),
+        'tier': customData.tier
       }
     };
 
     try {
       await window.electron.ipcRenderer.invoke('developer:simulateEvent', event);
-      console.log('Simulated KICK raid:', event);
+      console.log('Simulated KICK subscription renewal:', event);
     } catch (error) {
-      console.error('Failed to simulate KICK raid:', error);
+      console.error('Failed to simulate KICK subscription renewal:', error);
     }
   };
+
+  // Simulate a gifted subscription event
+  const simulateGiftedSubscription = async () => {
+    const event = {
+      type: 'channel.subscription.gifts',
+      platform: 'kick',
+      channel: 'testchannel',
+      user: customData.username,
+      amount: 1,
+      time: new Date().toISOString(),
+      tags: {
+        'user-id': Math.floor(Math.random() * 100000).toString(),
+        'channel-id': customData.channelId,
+        'tier': customData.tier,
+        'recipient': 'LuckyViewer' + Math.floor(Math.random() * 1000)
+      }
+    };
+
+    try {
+      await window.electron.ipcRenderer.invoke('developer:simulateEvent', event);
+      console.log('Simulated KICK gifted subscription:', event);
+    } catch (error) {
+      console.error('Failed to simulate KICK gifted subscription:', error);
+    }
+  };
+
+  // Simulate a user ban event
+  const simulateBan = async () => {
+    const event = {
+      type: 'moderation.banned',
+      platform: 'kick',
+      channel: 'testchannel',
+      user: customData.username,
+      message: 'Violated community guidelines',
+      time: new Date().toISOString(),
+      tags: {
+        'user-id': Math.floor(Math.random() * 100000).toString(),
+        'channel-id': customData.channelId,
+        'reason': 'Violated community guidelines'
+      }
+    };
+
+    try {
+      await window.electron.ipcRenderer.invoke('developer:simulateEvent', event);
+      console.log('Simulated KICK ban:', event);
+    } catch (error) {
+      console.error('Failed to simulate KICK ban:', error);
+    }
+  };
+
+  // Remove the simulateRaid function since KICK doesn't have raids
 
   // Generate automated event sequences
   const generateEventSequence = async () => {
@@ -118,7 +171,8 @@ const DeveloperKick: React.FC = () => {
       { type: 'chat', delay: 1000 },
       { type: 'subscription', delay: 2000 },
       { type: 'chat', delay: 3000 },
-      { type: 'raid', delay: 4000 }
+      { type: 'renewal', delay: 4000 },
+      { type: 'gift', delay: 5000 }
     ];
 
     for (const { type, delay } of events) {
@@ -133,8 +187,11 @@ const DeveloperKick: React.FC = () => {
           case 'subscription':
             await simulateSubscription();
             break;
-          case 'raid':
-            await simulateRaid();
+          case 'renewal':
+            await simulateSubscriptionRenewal();
+            break;
+          case 'gift':
+            await simulateGiftedSubscription();
             break;
         }
       }, delay);
@@ -142,7 +199,7 @@ const DeveloperKick: React.FC = () => {
 
     setTimeout(() => {
       setIsGeneratingSequence(false);
-    }, 5000);
+    }, 6000);
   };
 
   const inputStyle = {
@@ -323,12 +380,30 @@ const DeveloperKick: React.FC = () => {
             </button>
 
             <button
-              onClick={simulateRaid}
+              onClick={simulateSubscriptionRenewal}
               style={buttonStyle}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fff30'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#53fc18'}
             >
-              ⚡ Raid Event
+              🔄 Subscription Renewal
+            </button>
+
+            <button
+              onClick={simulateGiftedSubscription}
+              style={buttonStyle}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fff30'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#53fc18'}
+            >
+              🎁 Gifted Subscription
+            </button>
+
+            <button
+              onClick={simulateBan}
+              style={buttonStyle}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fff30'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#53fc18'}
+            >
+              🚫 User Ban
             </button>
           </div>
         </div>
@@ -379,7 +454,7 @@ const DeveloperKick: React.FC = () => {
               color: '#53fc18',
               fontSize: 14
             }}>
-              📡 Generating event sequence: Follow → Chat → Subscription → Chat → Raid
+              📡 Generating event sequence: Follow → Chat → Subscription → Chat → Renewal → Gift
             </div>
           )}
         </div>
