@@ -4,6 +4,7 @@ import tmi from 'tmi.js';
 import { eventBus } from './eventBus';
 import type { KickApiService } from './kickApi';
 import { createKickApiService } from './kickApi';
+import { kickWebSocketService } from './kickWebSocket';
 
 export type Platform = 'twitch' | 'kick';
 
@@ -233,17 +234,42 @@ class PlatformIntegrationService extends EventEmitter {
       }
     );
     
+    // Get channel information to extract channel ID for WebSocket
+    try {
+      const userInfo = await this.kickApiService.getCurrentUser();
+      const channelId = userInfo.id?.toString();
+      
+      if (!channelId) {
+        throw new Error('Could not get channel ID for WebSocket connection');
+      }
+      
+      // Connect to KICK WebSocket for real-time events
+      console.log('[PlatformIntegration] Connecting to KICK WebSocket...', { username: auth.username, channelId });
+      await kickWebSocketService.connect({
+        channelId,
+        accessToken: auth.accessToken,
+        username: auth.username
+      });
+      
+      console.log('[PlatformIntegration] KICK WebSocket connected successfully');
+      
+    } catch (error) {
+      console.error('[PlatformIntegration] Failed to connect KICK WebSocket:', error);
+      // Don't fail the entire connection if WebSocket fails
+      console.warn('[PlatformIntegration] Continuing without real-time events - check WebSocket connection');
+    }
+    
     this.connections.kick = { platform: 'kick', username: auth.username, connected: true };
     this.emit('status', this.connections.kick);
-    
-    // TODO: Implement KICK WebSocket connection for real-time events
-    // For Phase 3: Real-time Events implementation
     
     return this.connections.kick;
   }
 
   async disconnectKick() {
-    // TODO: Close KICK WebSocket connections when implemented
+    // Disconnect KICK WebSocket
+    console.log('[PlatformIntegration] Disconnecting KICK WebSocket...');
+    kickWebSocketService.disconnect();
+    
     this.kickAuth = null;
     this.kickApiService = null;
     this.connections.kick = { platform: 'kick', username: '', connected: false };

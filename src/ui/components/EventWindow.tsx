@@ -8,6 +8,7 @@ interface StreamEvent {
   message?: string;
   amount?: number;
   data?: any;
+  tags?: any;
   time: string;
 }
 
@@ -33,6 +34,11 @@ const platformGroups: PlatformEventGroup[] = [
     platform: 'twitch',
     displayName: 'Twitch',
     types: ['subscription', 'resub', 'subgift', 'cheer', 'hosted', 'raided', 'redeem']
+  },
+  {
+    platform: 'kick',
+    displayName: 'KICK',
+    types: ['channel.followed', 'channel.subscription.new', 'raided']
   }
 ];
 
@@ -45,6 +51,8 @@ const defaultConfigs: Record<string, EventDisplayConfig> = {
   hosted: { enabled: true, color: '#ff7f50', displayName: 'Hosts' },
   raided: { enabled: true, color: '#ff4500', displayName: 'Raids' },
   redeem: { enabled: true, color: '#00ff88', displayName: 'Channel Point Redemptions' },
+  'channel.followed': { enabled: true, color: '#00cc66', displayName: 'New Followers' },
+  'channel.subscription.new': { enabled: true, color: '#ff3366', displayName: 'New Subscriptions' },
 };
 
 interface EventWindowProps {
@@ -317,6 +325,20 @@ const EventWindow: React.FC<EventWindowProps> = ({ windowId, initialConfig, isSt
           <div style={{ color: config.color }}>
             <strong>🎁 {event.user}</strong> redeemed "{rewardTitle}" ({cost} points)
             {userInput && <div style={{ fontStyle: 'italic', marginTop: 4 }}>"{userInput}"</div>}
+          </div>
+        );
+      case 'channel.followed':
+        return (
+          <div style={{ color: config.color }}>
+            <strong>💚 {event.user}</strong> followed the channel!
+          </div>
+        );
+      case 'channel.subscription.new':
+        const subMonths = event.amount || 1;
+        const subTier = event.tags?.tier || 'Tier 1';
+        return (
+          <div style={{ color: config.color }}>
+            <strong>🎉 {event.user}</strong> subscribed ({subTier}, {subMonths} months)!
           </div>
         );
       default:
