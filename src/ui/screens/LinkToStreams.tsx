@@ -16,6 +16,7 @@ const LinkToStreams: React.FC = () => {
   const [kickClientSecret, setKickClientSecret] = useState("");
   const [kickCredentialsSaved, setKickCredentialsSaved] = useState(false);
   const [showKickCredentials, setShowKickCredentials] = useState(false);
+  const [showKickInstructions, setShowKickInstructions] = useState(false);
   
   const { getResponsiveContainerStyle } = useResponsiveLayout();
 
@@ -202,6 +203,104 @@ const LinkToStreams: React.FC = () => {
                 Create one here
               </a>
             </p>
+            
+            {/* Instructions Section */}
+            <div style={{ marginBottom: 16 }}>
+              <button
+                onClick={() => setShowKickInstructions(!showKickInstructions)}
+                style={{
+                  background: "transparent",
+                  border: "1px solid #444",
+                  color: "#ccc",
+                  padding: "6px 12px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span style={{ transform: showKickInstructions ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▶</span>
+                Setup Instructions
+              </button>
+              
+              {showKickInstructions && (
+                <div style={{ 
+                  background: "#1a1a1a", 
+                  border: "1px solid #333", 
+                  borderRadius: 6, 
+                  padding: 16, 
+                  marginTop: 8,
+                  fontSize: 13,
+                  lineHeight: 1.4
+                }}>
+                  <h4 style={{ color: "#53fc18", marginTop: 0, marginBottom: 12, fontSize: 14 }}>
+                    How to Create Your KICK OAuth Application:
+                  </h4>
+                  
+                  <ol style={{ paddingLeft: 20, margin: 0, color: "#ddd" }}>
+                    <li style={{ marginBottom: 8 }}>
+                      Click the "Create one here" link above to open KICK Developer Portal
+                    </li>
+                    <li style={{ marginBottom: 8 }}>
+                      Fill in the application details:
+                      <ul style={{ paddingLeft: 20, marginTop: 6 }}>
+                        <li style={{ marginBottom: 4 }}>
+                          <strong style={{ color: "#53fc18" }}>Application Name:</strong> Stream Mesh (or any name you prefer)
+                        </li>
+                        <li style={{ marginBottom: 4 }}>
+                          <strong style={{ color: "#53fc18" }}>Description:</strong> Desktop application for stream management
+                        </li>
+                        <li style={{ marginBottom: 4 }}>
+                          <strong style={{ color: "#53fc18" }}>Redirect URL:</strong> 
+                          <code style={{ 
+                            background: "#2a2a2a", 
+                            padding: "2px 6px", 
+                            borderRadius: 3, 
+                            marginLeft: 6,
+                            color: "#fff",
+                            fontSize: 12
+                          }}>
+                            http://localhost:3301/auth/kick/callback
+                          </code>
+                        </li>
+                        <li style={{ marginBottom: 4 }}>
+                          <strong style={{ color: "#53fc18" }}>Enable Webhooks:</strong> Leave blank (not required)
+                        </li>
+                      </ul>
+                    </li>
+                    <li style={{ marginBottom: 8 }}>
+                      <strong style={{ color: "#53fc18" }}>Scopes Requested:</strong> Select the following permissions:
+                      <ul style={{ paddingLeft: 20, marginTop: 6 }}>
+                        <li style={{ marginBottom: 2 }}>✓ Read stream key</li>
+                        <li style={{ marginBottom: 2 }}>✓ Read channel information</li>
+                        <li style={{ marginBottom: 2 }}>✓ Write to Chat feed</li>
+                        <li style={{ marginBottom: 2 }}>✓ Subscribe to events (read chat feed, follows, subscribes, gifts)</li>
+                      </ul>
+                    </li>
+                    <li style={{ marginBottom: 8 }}>
+                      Click "Create Application" to save
+                    </li>
+                    <li style={{ marginBottom: 0 }}>
+                      Copy the <strong style={{ color: "#53fc18" }}>Client ID</strong> and <strong style={{ color: "#53fc18" }}>Client Secret</strong> from the application details page
+                    </li>
+                  </ol>
+                  
+                  <div style={{ 
+                    background: "#2a2a2a", 
+                    border: "1px solid #53fc18", 
+                    borderRadius: 4, 
+                    padding: 12, 
+                    marginTop: 16,
+                    fontSize: 12
+                  }}>
+                    <strong style={{ color: "#53fc18" }}>⚠️ Important:</strong> Keep your Client Secret secure and never share it publicly. 
+                    It will be stored locally on your computer only.
+                  </div>
+                </div>
+              )}
+            </div>
             
             {!showKickCredentials ? (
               <button
