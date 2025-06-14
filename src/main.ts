@@ -24,6 +24,7 @@ const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
 const kickCredentialsFilePath = path.join(userDataPath, 'kickCredentials.json');
+const twitchCredentialsFilePath = path.join(userDataPath, 'twitchCredentials.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -83,6 +84,33 @@ function deleteKickCredentials(): void {
     }
   } catch (err) {
     console.error('Failed to delete KICK credentials file:', err);
+  }
+}
+
+// Twitch credentials storage functions (for user-provided client_id)
+function saveTwitchCredentials(credentials: { client_id: string }) {
+  fs.writeFileSync(twitchCredentialsFilePath, JSON.stringify(credentials, null, 2), 'utf-8');
+}
+
+function loadTwitchCredentials(): { client_id: string } | null {
+  try {
+    const data = fs.readFileSync(twitchCredentialsFilePath, 'utf-8');
+    const credentials = JSON.parse(data);
+    if (credentials && credentials.client_id) return credentials;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function deleteTwitchCredentials(): void {
+  try {
+    if (fs.existsSync(twitchCredentialsFilePath)) {
+      fs.unlinkSync(twitchCredentialsFilePath);
+      console.log('Twitch credentials file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete Twitch credentials file:', err);
   }
 }
 
@@ -498,14 +526,21 @@ app.whenReady().then(async () => {
   ipcMain.handle('twitch:oauth', async (_event) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('No main window');
+    
+    // Load user-provided credentials
+    const credentials = loadTwitchCredentials();
+    if (!credentials) {
+      throw new Error('Twitch credentials not found. Please save your Client ID first.');
+    }
+    
     try {
-      const accessToken = await startTwitchOAuth(win);
+      const accessToken = await startTwitchOAuth(win, credentials);
       console.log('Twitch OAuth accessToken:', accessToken);
       // Fetch the username using the Twitch API
       const userInfoRes = await fetch('https://api.twitch.tv/helix/users', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Client-Id': 'cboarqiyyeps1ew3f630aimpj6d8wf',
+          'Client-Id': credentials.client_id,
         },
       });
       const userInfo = await userInfoRes.json();
@@ -1116,6 +1151,37 @@ process.on('unhandledRejection', (reason, promise) => {
       return { success: true };
     } catch (err) {
       console.error('kick:deleteCredentials error:', err);
+      throw err;
+    }
+  });
+
+  // --- Twitch Credentials IPC handlers ---
+  ipcMain.handle('twitch:saveCredentials', async (_event, credentials: { client_id: string }) => {
+    try {
+      saveTwitchCredentials(credentials);
+      return { success: true };
+    } catch (err) {
+      console.error('twitch:saveCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('twitch:loadCredentials', async () => {
+    try {
+      const credentials = loadTwitchCredentials();
+      return credentials || null;
+    } catch (err) {
+      console.error('twitch:loadCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('twitch:deleteCredentials', async () => {
+    try {
+      deleteTwitchCredentials();
+      return { success: true };
+    } catch (err) {
+      console.error('twitch:deleteCredentials error:', err);
       throw err;
     }
   });

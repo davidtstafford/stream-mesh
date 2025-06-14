@@ -3,10 +3,7 @@ import { BrowserWindow, shell, session } from 'electron';
 import * as http from 'http';
 import * as url from 'url';
 
-const CLIENT_ID = 'cboarqiyyeps1ew3f630aimpj6d8wf';
 const OAUTH_PORT = 3300;
-const REDIRECT_URI = `http://localhost:${OAUTH_PORT}/auth/twitch/callback`;
-const OAUTH_URL = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=chat:read+chat:edit&force_verify=true`;
 
 // Clear Twitch session data
 export function clearTwitchSession(): Promise<void> {
@@ -43,8 +40,13 @@ export function clearTwitchSession(): Promise<void> {
   });
 }
 
-export function startTwitchOAuth(mainWindow: BrowserWindow): Promise<string> {
+export function startTwitchOAuth(mainWindow: BrowserWindow, credentials?: { client_id: string }): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Use provided credentials or fall back to hardcoded for backward compatibility
+    const CLIENT_ID = credentials?.client_id || 'cboarqiyyeps1ew3f630aimpj6d8wf';
+    const REDIRECT_URI = `http://localhost:${OAUTH_PORT}/auth/twitch/callback`;
+    const OAUTH_URL = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=chat:read+chat:edit&force_verify=true`;
+    
     // Start a local HTTP server to listen for the OAuth redirect
     const server = http.createServer((req, res) => {
       const reqUrl = url.parse(req.url || '', true);
