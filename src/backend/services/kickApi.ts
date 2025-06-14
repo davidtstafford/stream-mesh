@@ -88,7 +88,9 @@ export class KickApiService {
   private async apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     await this.ensureValidToken();
     
-    const url = endpoint.startsWith('http') ? endpoint : `https://kick.com/api/v2${endpoint}`;
+    // Use the correct KICK API base URL
+    const url = endpoint.startsWith('http') ? endpoint : `https://api.kick.com/public/v1${endpoint}`;
+    console.log('[KickApi] Making request to:', url);
     
     const response = await fetch(url, {
       ...options,
@@ -96,16 +98,28 @@ export class KickApiService {
         'Authorization': `Bearer ${this.accessToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'User-Agent': 'Stream Mesh/1.0.0',
         ...options.headers,
       },
     });
 
+    console.log('[KickApi] Response status:', response.status);
+
     if (!response.ok) {
       const errorBody = await response.text().catch(() => 'Unknown error');
+      console.error('[KickApi] Error response:', errorBody);
       const error = new Error(`KICK API error: ${response.status} ${response.statusText}`) as KickApiError;
       error.status = response.status;
       error.response = errorBody;
       throw error;
+    }
+
+    // Check content type before parsing JSON
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const body = await response.text();
+      console.error('[KickApi] Expected JSON but got:', contentType, 'Body:', body.substring(0, 200));
+      throw new Error(`KICK API returned unexpected content type: ${contentType}`);
     }
 
     return await response.json();
@@ -113,7 +127,23 @@ export class KickApiService {
 
   // Get current user information
   async getCurrentUser(): Promise<KickUser> {
-    return this.apiRequest<KickUser>('/user');
+    // KICK API v1/user doesn't work, use v1/channels instead (same as OAuth flow)
+    const response = await this.apiRequest<any>('/channels');
+    
+    // The v1/channels endpoint returns an array, we need the first channel
+    if (response && response.length > 0) {
+      const channel = response[0];
+      // Transform the channel response to match KickUser interface
+      return {
+        id: channel.broadcaster_user_id,
+        username: channel.slug,
+        slug: channel.slug,
+        email: '', // Not available in v1/channels
+        profile_pic: channel.banner_picture || '' // Use banner as profile pic fallback
+      };
+    }
+    
+    throw new Error('No channels found for user');
   }
 
   // Get channel information by slug

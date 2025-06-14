@@ -323,19 +323,28 @@ const KICK_REDIRECT_URI = 'http://localhost:3301/auth/kick/callback';
 - [ ] Phase 8: Testing & Documentation
 
 ### Current Status
-**Phase**: Phase 4 Complete - Ready for Phase 5  
+**Phase**: Integration Paused - Waiting for KICK WebSocket API  
 **Last Updated**: December 19, 2024  
-**Next Milestone**: Begin Phase 5 - Implement command system integration for KICK platform
+**Status**: KICK Integration Disabled Due to API Limitations
 
-**Phase 4 Developer Testing Tools - COMPLETED ✅**
-- ✅ KICK Developer screen created with full event simulation
-- ✅ Custom data input fields for all event parameters
-- ✅ Automated event sequences for testing UI responsiveness  
-- ✅ KICK-themed UI with proper styling and branding
-- ✅ Integration with main Developer screen via tabs
-- ✅ IPC handlers for event simulation implemented
-- ✅ EventsAdmin.tsx already had KICK platform configuration
-- ✅ All KICK events properly configured with colors and display names
+**Integration Status: PAUSED ⏸️**
+- ✅ Authentication & API infrastructure completed
+- ✅ Chat message sending works via official API
+- ✅ Developer testing tools completed
+- ❌ Real-time events (chat, follows, subs) blocked by API design
+- 🔄 Waiting for KICK to add WebSocket support for desktop applications
+
+**Why KICK Integration is Disabled:**
+KICK's official API only supports webhooks for real-time events, which require a publicly accessible web server. This is not practical for desktop applications where each user's machine would need a unique public URL. KICK has acknowledged this limitation and WebSocket support is on their roadmap, but no timeline has been announced.
+
+**GitHub Issue Reference:**
+https://github.com/kick-com/kick-api/issues/XXX - Request for WebSocket support for desktop applications
+
+**Current Implementation:**
+- UI shows professional "Coming Soon" message explaining the limitation
+- Auto-connection disabled to prevent failed connection attempts
+- All KICK-related connection logic safely disabled
+- Infrastructure preserved for future WebSocket integration
 
 ---
 

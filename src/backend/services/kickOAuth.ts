@@ -466,6 +466,8 @@ async function exchangeCodeForToken(code: string, codeVerifier: string, credenti
 
 // Refresh access token
 export async function refreshKickToken(refreshToken: string, credentials: { client_id: string, client_secret: string }): Promise<KickTokenResponse> {
+  console.log('[KickOAuth] Attempting to refresh token...');
+  
   const response = await fetch('https://id.kick.com/oauth/token', {
     method: 'POST',
     headers: {
@@ -480,12 +482,17 @@ export async function refreshKickToken(refreshToken: string, credentials: { clie
     }),
   });
   
+  console.log('[KickOAuth] Token refresh response status:', response.status);
+  
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[KickOAuth] Token refresh failed with error:', errorText);
     throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
   }
   
-  return await response.json();
+  const tokenData = await response.json();
+  console.log('[KickOAuth] Token refresh successful');
+  return tokenData;
 }
 
 // Validate token and get user info

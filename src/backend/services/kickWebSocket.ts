@@ -153,11 +153,19 @@ class KickWebSocketService extends EventEmitter {
   }
 
   private async fetchChannelInfo(username: string): Promise<any> {
-    const response = await fetch(`https://kick.com/api/v2/channels/${username}`);
+    console.log('[KickWebSocket] 📡 Fetching channel info for username:', username);
+    const response = await fetch(`https://kick.com/api/v1/channels/${username}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch channel info: ${response.status}`);
     }
-    return response.json();
+    const channelInfo = await response.json();
+    console.log('[KickWebSocket] ✅ Channel info retrieved:', {
+      id: channelInfo.id,
+      username: channelInfo.user?.username,
+      chatroomId: channelInfo.chatroom?.id,
+      isLive: !!channelInfo.livestream
+    });
+    return channelInfo;
   }
 
   private subscribeToChannelEvents(chatroomId: number, channelId: string): void {
@@ -166,13 +174,15 @@ class KickWebSocketService extends EventEmitter {
       return;
     }
 
+    console.log('[KickWebSocket] 🔌 Subscribing to channels...', { chatroomId, channelId });
+    
     // Subscribe to chat messages
     this.subscribe(`chatrooms.${chatroomId}.v2`);
     
     // Subscribe to channel events (follows, subscriptions, etc.)
     this.subscribe(`channel.${channelId}`);
     
-    console.log('[KickWebSocket] Subscribed to channel events', { chatroomId, channelId });
+    console.log('[KickWebSocket] ✅ Subscription requests sent');
   }
 
   private subscribe(channel: string): void {
@@ -187,12 +197,19 @@ class KickWebSocketService extends EventEmitter {
     };
 
     this.ws.send(JSON.stringify(subscribeMessage));
-    console.log('[KickWebSocket] Subscribed to channel:', channel);
+    console.log('[KickWebSocket] 📨 Subscription request sent for channel:', channel);
   }
 
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data);
+      
+      // DEBUG: Log ALL incoming messages to see what we're receiving
+      console.log('[KickWebSocket] Received message:', {
+        event: message.event,
+        channel: message.channel,
+        data: typeof message.data === 'string' ? message.data.substring(0, 200) + '...' : message.data
+      });
       
       // Handle Pusher protocol messages
       if (message.event === 'pusher:connection_established') {
@@ -201,15 +218,25 @@ class KickWebSocketService extends EventEmitter {
       }
       
       if (message.event === 'pusher:subscription_succeeded') {
-        console.log('[KickWebSocket] Subscribed to channel:', message.channel);
+        console.log('[KickWebSocket] ✅ Successfully subscribed to channel:', message.channel);
         return;
+      }
+
+      if (message.event === 'pusher:subscription_error') {
+        console.error('[KickWebSocket] ❌ Subscription error:', message);
+        return;
+      }
+
+      // DEBUG: Log all non-Pusher events
+      if (message.event && !message.event.startsWith('pusher:')) {
+        console.log('[KickWebSocket] 🔔 Received KICK event:', message.event, 'on channel:', message.channel);
       }
 
       // Handle KICK events
       this.processKickEvent(message);
       
     } catch (error) {
-      console.error('[KickWebSocket] Failed to parse message:', error, data);
+      console.error('[KickWebSocket] Failed to parse message:', error, 'Raw data:', data.substring(0, 200));
     }
   }
 

@@ -245,13 +245,18 @@ class PlatformIntegrationService extends EventEmitter {
       
       // Connect to KICK WebSocket for real-time events
       console.log('[PlatformIntegration] Connecting to KICK WebSocket...', { username: auth.username, channelId });
-      await kickWebSocketService.connect({
-        channelId,
-        accessToken: auth.accessToken,
-        username: auth.username
-      });
-      
-      console.log('[PlatformIntegration] KICK WebSocket connected successfully');
+      try {
+        await kickWebSocketService.connect({
+          channelId,
+          accessToken: auth.accessToken,
+          username: auth.username
+        });
+        console.log('[PlatformIntegration] KICK WebSocket connected successfully');
+      } catch (wsError) {
+        console.error('[PlatformIntegration] KICK WebSocket connection failed:', wsError);
+        console.log('[PlatformIntegration] Note: KICK may require webhook subscriptions instead of WebSocket');
+        // Don't fail the entire connection if WebSocket fails
+      }
       
     } catch (error) {
       console.error('[PlatformIntegration] Failed to connect KICK WebSocket:', error);

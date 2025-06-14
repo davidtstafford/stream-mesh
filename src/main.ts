@@ -324,36 +324,46 @@ app.whenReady().then(async () => {
   }
 
   // Auto-connect to KICK if credentials exist
-  const kickAuth = loadKickAuth();
-  if (kickAuth) {
-    // Load credentials for token refresh
-    const kickCredentials = loadKickCredentials();
-    if (!kickCredentials) {
-      console.log('KICK credentials not found, skipping auto-connect');
-    } else {
-      try {
-        // Check if token is expired and refresh if needed
-        if (Date.now() >= kickAuth.expiresAt) {
-          console.log('KICK token expired, refreshing...');
-          const refreshedTokens = await refreshKickToken(kickAuth.refreshToken, kickCredentials);
-        const updatedAuth = {
-          username: kickAuth.username,
-          accessToken: refreshedTokens.access_token,
-          refreshToken: refreshedTokens.refresh_token,
-          expiresAt: Date.now() + (refreshedTokens.expires_in * 1000)
-        };
-        saveKickAuth(updatedAuth);
-        await platformIntegrationService.connectKickWithOAuth(updatedAuth);
-        console.log('Auto-connected to KICK as', updatedAuth.username);
-      } else {
-        await platformIntegrationService.connectKickWithOAuth(kickAuth);
-        console.log('Auto-connected to KICK as', kickAuth.username);
-      }
-      } catch (err) {
-        console.error('Failed to auto-connect to KICK:', err);
-      }
-    }
-  }
+  // DISABLED: KICK integration disabled until WebSocket support is available
+  // const kickAuth = loadKickAuth();
+  // if (kickAuth) {
+  //   // Load credentials for token refresh
+  //   const kickCredentials = loadKickCredentials();
+  //   if (!kickCredentials) {
+  //     console.log('KICK credentials not found, skipping auto-connect');
+  //   } else {
+  //     try {
+  //       // Check if token is expired and refresh if needed
+  //       if (Date.now() >= kickAuth.expiresAt) {
+  //         console.log('KICK token expired, refreshing...');
+  //         try {
+  //           const refreshedTokens = await refreshKickToken(kickAuth.refreshToken, kickCredentials);
+  //           const updatedAuth = {
+  //             username: kickAuth.username,
+  //             accessToken: refreshedTokens.access_token,
+  //             refreshToken: refreshedTokens.refresh_token,
+  //             expiresAt: Date.now() + (refreshedTokens.expires_in * 1000)
+  //           };
+  //           saveKickAuth(updatedAuth);
+  //           await platformIntegrationService.connectKickWithOAuth(updatedAuth);
+  //           console.log('Auto-connected to KICK as', updatedAuth.username);
+  //         } catch (refreshError) {
+  //           console.error('Failed to refresh KICK token:', refreshError);
+  //           console.log('Please reconnect KICK manually through the UI');
+  //           // Clear the invalid auth data
+  //           deleteKickAuth();
+  //         }
+  //       } else {
+  //         await platformIntegrationService.connectKickWithOAuth(kickAuth);
+  //         console.log('Auto-connected to KICK as', kickAuth.username);
+  //       }
+  //     } catch (err) {
+  //       console.error('Failed to auto-connect to KICK:', err);
+  //       console.log('Please reconnect KICK manually through the UI');
+  //     }
+  //   }
+  // }
+  console.log('KICK auto-connection disabled - waiting for WebSocket API support');
 
   // Listen for KICK token refresh events to save updated tokens
   platformIntegrationService.on('kick-token-refreshed', (newAuth) => {
@@ -645,7 +655,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('kick:status', async () => {
     try {
-      return platformIntegrationService.getKickStatus();
+      // KICK integration disabled - WebSocket events not available for desktop apps
+      // Return disconnected status to prevent auto-connection attempts
+      return { connected: false, username: "", disabled: true, reason: "Real-time events require WebSocket support" };
     } catch (err) {
       console.error('kick:status error:', err);
       throw err;
