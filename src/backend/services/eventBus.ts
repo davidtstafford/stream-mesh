@@ -1,10 +1,12 @@
 // Event Bus Service - Unified event system for all stream events
 import { EventEmitter } from 'events';
+import { Platform } from './platformIntegration';
 
 // Unified event interface for all stream events
 export interface StreamEvent {
-  type: 'chat' | 'subscription' | 'resub' | 'subgift' | 'cheer' | 'hosted' | 'raided' | 'redeem';
-  platform: string;
+  type: 'chat' | 'subscription' | 'resub' | 'subgift' | 'cheer' | 'hosted' | 'raided' | 'redeem' | 
+        'chat.message.sent' | 'channel.followed' | 'channel.subscription.new' | 'channel.subscription.renewal' | 'channel.subscription.gifts' | 'moderation.banned';
+  platform: Platform;
   channel: string;
   user: string;
   message?: string;
@@ -16,7 +18,7 @@ export interface StreamEvent {
 
 // Legacy chat event interface for backward compatibility
 export interface ChatMessageEvent {
-  platform: string;
+  platform: Platform;
   channel: string;
   user: string;
   message: string;

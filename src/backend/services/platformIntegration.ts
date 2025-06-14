@@ -2,8 +2,11 @@
 import { EventEmitter } from 'events';
 import tmi from 'tmi.js';
 import { eventBus } from './eventBus';
+import type { KickApiService } from './kickApi';
+import { createKickApiService } from './kickApi';
+import { kickWebSocketService } from './kickWebSocket';
 
-export type Platform = 'twitch';
+export type Platform = 'twitch' | 'kick';
 
 export interface PlatformConnection {
   platform: Platform;
@@ -16,12 +19,22 @@ export interface TwitchAuth {
   accessToken: string;
 }
 
+export interface KickAuth {
+  username: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
 class PlatformIntegrationService extends EventEmitter {
   private connections: Record<Platform, PlatformConnection> = {
     twitch: { platform: 'twitch', username: '', connected: false },
+    kick: { platform: 'kick', username: '', connected: false },
   };
   private twitchClient: any = null;
   private twitchAuth: TwitchAuth | null = null;
+  private kickAuth: KickAuth | null = null;
+  private kickApiService: KickApiService | null = null;
 
   connectTwitch(username: string) {
     if (!username || typeof username !== 'string' || !username.trim()) {
@@ -58,7 +71,7 @@ class PlatformIntegrationService extends EventEmitter {
       if (!self) {
         const chatEvent = {
           type: 'chat' as const,
-          platform: 'twitch',
+          platform: 'twitch' as const,
           channel,
           user: tags['display-name'] || tags.username,
           message,
@@ -74,7 +87,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('subscription', (channel: string, username: string, method: any, message: string, tags: any) => {
       const subscriptionEvent = {
         type: 'subscription' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: message || undefined,
@@ -91,7 +104,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('resub', (channel: string, username: string, months: number, message: string, tags: any, method: any) => {
       const resubEvent = {
         type: 'resub' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: message || undefined,
@@ -108,7 +121,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('subgift', (channel: string, username: string, streakMonths: number, recipient: string, method: any, tags: any) => {
       const subgiftEvent = {
         type: 'subgift' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -125,7 +138,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('cheer', (channel: string, tags: any, message: string) => {
       const cheerEvent = {
         type: 'cheer' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: tags['display-name'] || tags.username,
         message: message || undefined,
@@ -142,7 +155,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('hosted', (channel: string, username: string, viewers: number, autohost: boolean) => {
       const hostedEvent = {
         type: 'hosted' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -159,7 +172,7 @@ class PlatformIntegrationService extends EventEmitter {
     this.twitchClient.on('raided', (channel: string, username: string, viewers: number) => {
       const raidedEvent = {
         type: 'raided' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: username,
         message: undefined,
@@ -195,6 +208,84 @@ class PlatformIntegrationService extends EventEmitter {
     return this.connections.twitch;
   }
 
+  // KICK connection methods
+  async connectKickWithOAuth(auth: KickAuth) {
+    if (!auth.username || !auth.accessToken) {
+      throw new Error('Username and access token are required for KICK.');
+    }
+    
+    this.kickAuth = auth;
+    
+    // Create KICK API service with token refresh callback
+    this.kickApiService = createKickApiService(
+      auth.accessToken,
+      auth.refreshToken,
+      auth.expiresAt,
+      (newAuth: { accessToken: string; refreshToken: string; expiresAt: number }) => {
+        // Update stored auth when tokens are refreshed
+        if (this.kickAuth) {
+          this.kickAuth.accessToken = newAuth.accessToken;
+          this.kickAuth.refreshToken = newAuth.refreshToken;
+          this.kickAuth.expiresAt = newAuth.expiresAt;
+          
+          // Emit event so main.ts can save the updated tokens
+          this.emit('kick-token-refreshed', this.kickAuth);
+        }
+      }
+    );
+    
+    // Get channel information to extract channel ID for WebSocket
+    try {
+      const userInfo = await this.kickApiService.getCurrentUser();
+      const channelId = userInfo.id?.toString();
+      
+      if (!channelId) {
+        throw new Error('Could not get channel ID for WebSocket connection');
+      }
+      
+      // Connect to KICK WebSocket for real-time events
+      console.log('[PlatformIntegration] Connecting to KICK WebSocket...', { username: auth.username, channelId });
+      try {
+        await kickWebSocketService.connect({
+          channelId,
+          accessToken: auth.accessToken,
+          username: auth.username
+        });
+        console.log('[PlatformIntegration] KICK WebSocket connected successfully');
+      } catch (wsError) {
+        console.error('[PlatformIntegration] KICK WebSocket connection failed:', wsError);
+        console.log('[PlatformIntegration] Note: KICK may require webhook subscriptions instead of WebSocket');
+        // Don't fail the entire connection if WebSocket fails
+      }
+      
+    } catch (error) {
+      console.error('[PlatformIntegration] Failed to connect KICK WebSocket:', error);
+      // Don't fail the entire connection if WebSocket fails
+      console.warn('[PlatformIntegration] Continuing without real-time events - check WebSocket connection');
+    }
+    
+    this.connections.kick = { platform: 'kick', username: auth.username, connected: true };
+    this.emit('status', this.connections.kick);
+    
+    return this.connections.kick;
+  }
+
+  async disconnectKick() {
+    // Disconnect KICK WebSocket
+    console.log('[PlatformIntegration] Disconnecting KICK WebSocket...');
+    kickWebSocketService.disconnect();
+    
+    this.kickAuth = null;
+    this.kickApiService = null;
+    this.connections.kick = { platform: 'kick', username: '', connected: false };
+    this.emit('status', this.connections.kick);
+    return this.connections.kick;
+  }
+
+  getKickStatus() {
+    return this.connections.kick;
+  }
+
   // Send a chat message to the connected platform
   async sendChatMessage(message: string, platform: Platform = 'twitch', skipTTS: boolean = true): Promise<void> {
     if (platform === 'twitch') {
@@ -209,13 +300,38 @@ class PlatformIntegrationService extends EventEmitter {
       // Emit a chat event for our own message so it appears in the UI
       const chatEvent = {
         type: 'chat' as const,
-        platform: 'twitch',
+        platform: 'twitch' as const,
         channel,
         user: this.connections.twitch.username,
         message,
         tags: {
           'user-id': 'bot',
           'display-name': this.connections.twitch.username,
+          'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
+        },
+        time: new Date().toISOString(),
+      };
+      eventBus.emitEvent(chatEvent);
+      this.emit('chat', chatEvent);
+    } else if (platform === 'kick') {
+      if (!this.connections.kick.connected || !this.kickApiService) {
+        throw new Error('Not connected to KICK');
+      }
+      
+      // Send message using KICK API service
+      const channelSlug = this.connections.kick.username;
+      await this.kickApiService.sendChatMessage(channelSlug, message);
+      
+      // Emit a chat event for our own message so it appears in the UI
+      const chatEvent = {
+        type: 'chat.message.sent' as const,
+        platform: 'kick' as const,
+        channel: this.connections.kick.username,
+        user: this.connections.kick.username,
+        message,
+        tags: {
+          'user-id': 'bot',
+          'display-name': this.connections.kick.username,
           'is-bot-message': skipTTS ? 'true' : 'false' // Mark bot messages to skip TTS
         },
         time: new Date().toISOString(),
@@ -236,7 +352,7 @@ class PlatformIntegrationService extends EventEmitter {
 
     const redeemEvent = {
       type: 'redeem' as const,
-      platform: 'twitch',
+      platform: 'twitch' as const,
       channel: this.connections.twitch.username,
       user: username,
       message: userInput || undefined,

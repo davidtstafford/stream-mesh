@@ -12,7 +12,6 @@ import Events from './screens/Events';
 import EventsAdmin from './screens/EventsAdmin';
 import EventHistory from './screens/EventHistory';
 import Developer from './screens/Developer';
-import DeveloperTwitch from './screens/DeveloperTwitch';
 import EventWindow from './components/EventWindow';
 import './theme/theme.css';
 
@@ -28,7 +27,6 @@ const screenMap: Record<string, React.ReactNode> = {
   eventsAdmin: <EventsAdmin />,
   eventHistory: <EventHistory />,
   developer: <Developer />,
-  developerTwitch: <DeveloperTwitch />,
 };
 
 const App: React.FC = () => {

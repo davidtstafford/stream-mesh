@@ -1,6 +1,6 @@
 // Command processing service for handling chat commands
 import { EventEmitter } from 'events';
-import { platformIntegrationService } from './platformIntegration';
+import { platformIntegrationService, Platform } from './platformIntegration';
 import { eventBus, StreamEvent } from './eventBus';
 import { fetchViewerSettings } from '../core/database';
 import pollyVoiceEngines from '../../shared/assets/pollyVoiceEngines.sorted.json';
@@ -47,7 +47,7 @@ class CommandProcessor extends EventEmitter {
         // Check if TTS is enabled for this command
         const systemCommand = this.systemCommands.get('~hello');
         const skipTTS = systemCommand ? !systemCommand.enableTTSReply : true;
-        await platformIntegrationService.sendChatMessage(response, 'twitch', skipTTS);
+        await platformIntegrationService.sendChatMessage(response, event.platform, skipTTS);
       }
     };
 
@@ -77,12 +77,13 @@ class CommandProcessor extends EventEmitter {
           const neuralStatus = disableNeuralVoices ? 'Neural voices are DISABLED' : 'Neural voices are ENABLED';
           const response = `@${event.user} View all 94 available TTS voices here: https://stream-mesh-website.web.app/voices.html • ${neuralStatus}`;
 
-          await this.sendCommandResponse(response, '~voices');
+          await this.sendCommandResponse(response, '~voices', event.platform);
         } catch (error) {
           console.error('[CommandProcessor] Error in ~voices command:', error);
           await this.sendCommandResponse(
             `@${event.user} Sorry, failed to retrieve voice information.`,
-            '~voices'
+            '~voices',
+            event.platform
           );
         }
       }
@@ -107,7 +108,8 @@ class CommandProcessor extends EventEmitter {
           if (!voiceName) {
             await this.sendCommandResponse(
               `@${event.user} Please specify a voice name. Use ~voices to see available voices. Example: ~setvoice Joanna`,
-              '~setvoice'
+              '~setvoice',
+              event.platform
             );
             return;
           }
@@ -137,7 +139,8 @@ class CommandProcessor extends EventEmitter {
           if (!foundVoice) {
             await this.sendCommandResponse(
               `@${event.user} Voice "${voiceName}" not found. Use ~voices to see available voices.`,
-              '~setvoice'
+              '~setvoice',
+              event.platform
             );
             return;
           }
@@ -162,14 +165,16 @@ class CommandProcessor extends EventEmitter {
 
           await this.sendCommandResponse(
             `@${event.user} Your TTS voice has been set to ${foundVoice.Name} (${foundVoice.LanguageName}). Your next message will use this voice!`,
-            '~setvoice'
+            '~setvoice',
+            event.platform
           );
           
         } catch (error) {
           console.error('[CommandProcessor] Error in ~setvoice command:', error);
           await this.sendCommandResponse(
             `@${event.user} Sorry, failed to set your voice. Please try again.`,
-            '~setvoice'
+            '~setvoice',
+            event.platform
           );
         }
       }
@@ -207,7 +212,8 @@ class CommandProcessor extends EventEmitter {
           if (!currentVoice || currentVoice === '') {
             await this.sendCommandResponse(
               `@${event.user} You haven't set a custom TTS voice yet. Using default voice. Use ~setvoice [name] to set your voice (see ~voices for options).`,
-              '~myvoice'
+              '~myvoice',
+              event.platform
             );
             return;
           }
@@ -219,12 +225,14 @@ class CommandProcessor extends EventEmitter {
           if (voiceDetails) {
             await this.sendCommandResponse(
               `@${event.user} Your TTS voice is set to ${voiceDetails.Name} (${voiceDetails.LanguageName}). Use ~setvoice [name] to change it.`,
-              '~myvoice'
+              '~myvoice',
+              event.platform
             );
           } else {
             await this.sendCommandResponse(
               `@${event.user} Your TTS voice is set to ${currentVoice}, but this voice is no longer available. Use ~setvoice [name] to update it.`,
-              '~myvoice'
+              '~myvoice',
+              event.platform
             );
           }
           
@@ -232,7 +240,8 @@ class CommandProcessor extends EventEmitter {
           console.error('[CommandProcessor] Error in ~myvoice command:', error);
           await this.sendCommandResponse(
             `@${event.user} Sorry, failed to retrieve your voice setting.`,
-            '~myvoice'
+            '~myvoice',
+            event.platform
           );
         }
       }
@@ -252,7 +261,13 @@ class CommandProcessor extends EventEmitter {
 
   // Check if user has permission to execute a command
   private async checkPermission(event: StreamEvent, requiredLevel: PermissionLevel): Promise<boolean> {
-    // Get user ID for database lookup
+    // Check if role is already provided in tags (for real-time events)
+    const tagRole = event.tags?.['role'];
+    if (tagRole) {
+      return this.checkRolePermission(tagRole, requiredLevel);
+    }
+
+    // Fall back to database lookup for stored role settings
     const platformUserId = event.tags?.['user-id'] || event.user;
     const platform = event.platform;
     const crypto = require('crypto');
@@ -269,22 +284,23 @@ class CommandProcessor extends EventEmitter {
         const roleSetting = rows.find(r => r.key === 'role');
         const userRole = roleSetting?.value || 'viewer';
         
-        // Check permission hierarchy
-        switch (requiredLevel) {
-          case 'viewer':
-            resolve(true); // Everyone can run viewer commands
-            break;
-          case 'moderator':
-            resolve(userRole === 'moderator' || userRole === 'super_moderator');
-            break;
-          case 'super_moderator':
-            resolve(userRole === 'super_moderator');
-            break;
-          default:
-            resolve(false);
-        }
+        resolve(this.checkRolePermission(userRole, requiredLevel));
       });
     });
+  }
+
+  // Helper method to check role permission hierarchy
+  private checkRolePermission(userRole: string, requiredLevel: PermissionLevel): boolean {
+    switch (requiredLevel) {
+      case 'viewer':
+        return true; // Everyone can run viewer commands
+      case 'moderator':
+        return userRole === 'moderator' || userRole === 'super_moderator';
+      case 'super_moderator':
+        return userRole === 'super_moderator';
+      default:
+        return false;
+    }
   }
 
   private setupEventListeners() {
@@ -309,7 +325,7 @@ class CommandProcessor extends EventEmitter {
             // Send permission denied message (never read by TTS)
             await platformIntegrationService.sendChatMessage(
               `@${event.user} You don't have permission to use that command. (Requires ${systemCommand.permissionLevel} or higher)`,
-              'twitch',
+              event.platform,
               true // Always skip TTS for permission denied messages
             );
             return;
@@ -327,10 +343,10 @@ class CommandProcessor extends EventEmitter {
   }
 
   // Custom sendChatMessage that respects TTS settings
-  async sendCommandResponse(message: string, command: string): Promise<void> {
+  async sendCommandResponse(message: string, command: string, platform: Platform = 'twitch'): Promise<void> {
     const systemCommand = this.systemCommands.get(command);
     const skipTTS = systemCommand ? !systemCommand.enableTTSReply : true;
-    await platformIntegrationService.sendChatMessage(message, 'twitch', skipTTS);
+    await platformIntegrationService.sendChatMessage(message, platform, skipTTS);
   }
 
   // Get all system commands for UI (without the handler functions)

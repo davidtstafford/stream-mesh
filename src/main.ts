@@ -5,7 +5,8 @@ import * as path from 'path';
 const isDev = require('electron-is-dev');
 import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
-import { startTwitchOAuth } from './backend/services/twitchOAuth';
+import { startTwitchOAuth, clearTwitchSession } from './backend/services/twitchOAuth';
+import { startKickOAuth, validateKickToken, refreshKickToken, clearKickSession } from './backend/services/kickOAuth';
 import { eventBus } from './backend/services/eventBus';
 import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
 import { ttsQueue } from './backend/services/ttsQueue';
@@ -18,9 +19,12 @@ const express = require('express') as typeof import('express');
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
+const kickAuthFilePath = path.join(userDataPath, 'kickAuth.json');
 const ttsSettingsFilePath = path.join(userDataPath, 'ttsSettings.json');
 const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
+const kickCredentialsFilePath = path.join(userDataPath, 'kickCredentials.json');
+const twitchCredentialsFilePath = path.join(userDataPath, 'twitchCredentials.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -37,6 +41,99 @@ function loadTwitchAuth(): { username: string, accessToken: string } | null {
     return null;
   } catch {
     return null;
+  }
+}
+
+// KICK auth storage functions
+function saveKickAuth(auth: { username: string, accessToken: string, refreshToken: string, expiresAt: number }) {
+  fs.writeFileSync(kickAuthFilePath, JSON.stringify(auth, null, 2), 'utf-8');
+}
+
+function loadKickAuth(): { username: string, accessToken: string, refreshToken: string, expiresAt: number } | null {
+  try {
+    const data = fs.readFileSync(kickAuthFilePath, 'utf-8');
+    const auth = JSON.parse(data);
+    if (auth && auth.username && auth.accessToken && auth.refreshToken && auth.expiresAt) return auth;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// KICK credentials storage functions (for user-provided client_id and client_secret)
+function saveKickCredentials(credentials: { client_id: string, client_secret: string }) {
+  fs.writeFileSync(kickCredentialsFilePath, JSON.stringify(credentials, null, 2), 'utf-8');
+}
+
+function loadKickCredentials(): { client_id: string, client_secret: string } | null {
+  try {
+    const data = fs.readFileSync(kickCredentialsFilePath, 'utf-8');
+    const credentials = JSON.parse(data);
+    if (credentials && credentials.client_id && credentials.client_secret) return credentials;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function deleteKickCredentials(): void {
+  try {
+    if (fs.existsSync(kickCredentialsFilePath)) {
+      fs.unlinkSync(kickCredentialsFilePath);
+      console.log('KICK credentials file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete KICK credentials file:', err);
+  }
+}
+
+// Twitch credentials storage functions (for user-provided client_id)
+function saveTwitchCredentials(credentials: { client_id: string }) {
+  fs.writeFileSync(twitchCredentialsFilePath, JSON.stringify(credentials, null, 2), 'utf-8');
+}
+
+function loadTwitchCredentials(): { client_id: string } | null {
+  try {
+    const data = fs.readFileSync(twitchCredentialsFilePath, 'utf-8');
+    const credentials = JSON.parse(data);
+    if (credentials && credentials.client_id) return credentials;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function deleteTwitchCredentials(): void {
+  try {
+    if (fs.existsSync(twitchCredentialsFilePath)) {
+      fs.unlinkSync(twitchCredentialsFilePath);
+      console.log('Twitch credentials file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete Twitch credentials file:', err);
+  }
+}
+
+// Auth deletion functions
+function deleteTwitchAuth(): void {
+  try {
+    if (fs.existsSync(authFilePath)) {
+      fs.unlinkSync(authFilePath);
+      console.log('Twitch auth file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete Twitch auth file:', err);
+  }
+}
+
+function deleteKickAuth(): void {
+  try {
+    if (fs.existsSync(kickAuthFilePath)) {
+      fs.unlinkSync(kickAuthFilePath);
+      console.log('KICK auth file deleted');
+    }
+  } catch (err) {
+    console.error('Failed to delete KICK auth file:', err);
   }
 }
 
@@ -226,6 +323,54 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Auto-connect to KICK if credentials exist
+  // DISABLED: KICK integration disabled until WebSocket support is available
+  // const kickAuth = loadKickAuth();
+  // if (kickAuth) {
+  //   // Load credentials for token refresh
+  //   const kickCredentials = loadKickCredentials();
+  //   if (!kickCredentials) {
+  //     console.log('KICK credentials not found, skipping auto-connect');
+  //   } else {
+  //     try {
+  //       // Check if token is expired and refresh if needed
+  //       if (Date.now() >= kickAuth.expiresAt) {
+  //         console.log('KICK token expired, refreshing...');
+  //         try {
+  //           const refreshedTokens = await refreshKickToken(kickAuth.refreshToken, kickCredentials);
+  //           const updatedAuth = {
+  //             username: kickAuth.username,
+  //             accessToken: refreshedTokens.access_token,
+  //             refreshToken: refreshedTokens.refresh_token,
+  //             expiresAt: Date.now() + (refreshedTokens.expires_in * 1000)
+  //           };
+  //           saveKickAuth(updatedAuth);
+  //           await platformIntegrationService.connectKickWithOAuth(updatedAuth);
+  //           console.log('Auto-connected to KICK as', updatedAuth.username);
+  //         } catch (refreshError) {
+  //           console.error('Failed to refresh KICK token:', refreshError);
+  //           console.log('Please reconnect KICK manually through the UI');
+  //           // Clear the invalid auth data
+  //           deleteKickAuth();
+  //         }
+  //       } else {
+  //         await platformIntegrationService.connectKickWithOAuth(kickAuth);
+  //         console.log('Auto-connected to KICK as', kickAuth.username);
+  //       }
+  //     } catch (err) {
+  //       console.error('Failed to auto-connect to KICK:', err);
+  //       console.log('Please reconnect KICK manually through the UI');
+  //     }
+  //   }
+  // }
+  console.log('KICK auto-connection disabled - waiting for WebSocket API support');
+
+  // Listen for KICK token refresh events to save updated tokens
+  platformIntegrationService.on('kick-token-refreshed', (newAuth) => {
+    console.log('KICK tokens refreshed, saving to storage...');
+    saveKickAuth(newAuth);
+  });
+
   // Register all IPC handlers (chat, twitch, etc.)
   // IPC handlers for chat messages
   ipcMain.handle('chat:insert', async (_event, msg) => {
@@ -358,6 +503,21 @@ app.whenReady().then(async () => {
     }
   });
 
+  // KICK Developer simulation handler (alias for triggerEvent)
+  ipcMain.handle('developer:simulateEvent', async (_event, eventData) => {
+    try {
+      console.log('Developer: Simulating KICK event:', eventData);
+      
+      // Send the event through the eventBus using the correct method
+      eventBus.emitEvent(eventData);
+      
+      return { success: true, message: `Simulated ${eventData.type} event successfully` };
+    } catch (err) {
+      console.error('developer:simulateEvent error:', err);
+      throw err;
+    }
+  });
+
   // Twitch connection IPC handlers with error logging
   ipcMain.handle('twitch:connect', async (_event, username: string) => {
     try {
@@ -369,7 +529,10 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('twitch:disconnect', async () => {
     try {
-      return platformIntegrationService.disconnectTwitch();
+      const result = platformIntegrationService.disconnectTwitch();
+      deleteTwitchAuth(); // Delete stored auth file
+      await clearTwitchSession(); // Clear browser session data
+      return result;
     } catch (err) {
       console.error('twitch:disconnect error:', err);
       throw err;
@@ -388,14 +551,21 @@ app.whenReady().then(async () => {
   ipcMain.handle('twitch:oauth', async (_event) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('No main window');
+    
+    // Load user-provided credentials
+    const credentials = loadTwitchCredentials();
+    if (!credentials) {
+      throw new Error('Twitch credentials not found. Please save your Client ID first.');
+    }
+    
     try {
-      const accessToken = await startTwitchOAuth(win);
+      const accessToken = await startTwitchOAuth(win, credentials);
       console.log('Twitch OAuth accessToken:', accessToken);
       // Fetch the username using the Twitch API
       const userInfoRes = await fetch('https://api.twitch.tv/helix/users', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Client-Id': 'cboarqiyyeps1ew3f630aimpj6d8wf',
+          'Client-Id': credentials.client_id,
         },
       });
       const userInfo = await userInfoRes.json();
@@ -408,6 +578,88 @@ app.whenReady().then(async () => {
       return { accessToken, username };
     } catch (err) {
       console.error('Twitch OAuth error:', err);
+      throw err;
+    }
+  });
+
+  // --- KICK OAuth IPC handlers ---
+  ipcMain.handle('kick:oauth', async (_event) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) throw new Error('No main window');
+    
+    // Load user-provided credentials
+    const credentials = loadKickCredentials();
+    if (!credentials) {
+      throw new Error('KICK credentials not found. Please save your Client ID and Client Secret first.');
+    }
+    
+    try {
+      const tokenResponse = await startKickOAuth(win, credentials);
+      console.log('KICK OAuth token response:', tokenResponse);
+      
+      // Validate token and get user info
+      const userInfo = await validateKickToken(tokenResponse.access_token);
+      console.log('KICK userInfo response:', userInfo);
+      
+      // Extract username from channels API response
+      let username: string;
+      if (userInfo.data && Array.isArray(userInfo.data) && userInfo.data.length > 0) {
+        const lastChannel = userInfo.data[userInfo.data.length - 1];
+        username = lastChannel.slug || lastChannel.broadcaster_username;
+      } else {
+        username = userInfo.username || userInfo.login || userInfo.slug;
+      }
+      
+      if (!username) throw new Error('Could not fetch KICK username from API response');
+      
+      // Prepare auth object
+      const kickAuth = {
+        username,
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token,
+        expiresAt: Date.now() + (tokenResponse.expires_in * 1000)
+      };
+      
+      // Connect to KICK
+      await platformIntegrationService.connectKickWithOAuth(kickAuth);
+      saveKickAuth(kickAuth);
+      
+      return { accessToken: tokenResponse.access_token, username };
+    } catch (err) {
+      console.error('KICK OAuth error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:connect', async (_event, username: string) => {
+    try {
+      // For now, this is a placeholder - KICK uses OAuth only
+      throw new Error('KICK requires OAuth authentication. Use kick:oauth instead.');
+    } catch (err) {
+      console.error('kick:connect error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:disconnect', async () => {
+    try {
+      const result = platformIntegrationService.disconnectKick();
+      deleteKickAuth(); // Delete stored auth file
+      await clearKickSession(); // Clear browser session data
+      return result;
+    } catch (err) {
+      console.error('kick:disconnect error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:status', async () => {
+    try {
+      // KICK integration disabled - WebSocket events not available for desktop apps
+      // Return disconnected status to prevent auto-connection attempts
+      return { connected: false, username: "", disabled: true, reason: "Real-time events require WebSocket support" };
+    } catch (err) {
+      console.error('kick:status error:', err);
       throw err;
     }
   });
@@ -642,6 +894,16 @@ app.whenReady().then(async () => {
       }
       const absPath = path.join(basePath, relativePath);
       await shell.openPath(absPath);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  });
+
+  // Register IPC handler to open external URLs
+  ipcMain.handle('open-external-url', async (_event, url: string) => {
+    try {
+      await shell.openExternal(url);
       return true;
     } catch (err) {
       return false;
@@ -888,3 +1150,65 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// --- KICK Credentials IPC handlers ---
+  ipcMain.handle('kick:saveCredentials', async (_event, credentials: { client_id: string, client_secret: string }) => {
+    try {
+      saveKickCredentials(credentials);
+      return { success: true };
+    } catch (err) {
+      console.error('kick:saveCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:loadCredentials', async () => {
+    try {
+      const credentials = loadKickCredentials();
+      return credentials || null;
+    } catch (err) {
+      console.error('kick:loadCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('kick:deleteCredentials', async () => {
+    try {
+      deleteKickCredentials();
+      return { success: true };
+    } catch (err) {
+      console.error('kick:deleteCredentials error:', err);
+      throw err;
+    }
+  });
+
+  // --- Twitch Credentials IPC handlers ---
+  ipcMain.handle('twitch:saveCredentials', async (_event, credentials: { client_id: string }) => {
+    try {
+      saveTwitchCredentials(credentials);
+      return { success: true };
+    } catch (err) {
+      console.error('twitch:saveCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('twitch:loadCredentials', async () => {
+    try {
+      const credentials = loadTwitchCredentials();
+      return credentials || null;
+    } catch (err) {
+      console.error('twitch:loadCredentials error:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle('twitch:deleteCredentials', async () => {
+    try {
+      deleteTwitchCredentials();
+      return { success: true };
+    } catch (err) {
+      console.error('twitch:deleteCredentials error:', err);
+      throw err;
+    }
+  });

@@ -19,7 +19,6 @@ const commandItems = [
 ];
 const TestingSimulationItems = [
   { label: 'Event Simulator', key: 'developer', icon: '🎮' },
-  { label: 'Twitch Events', key: 'developerTwitch', icon: '💜' },
 ];
 
 const NavigationBar: React.FC<{ 
