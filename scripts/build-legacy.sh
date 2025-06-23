@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e  # Exit on any error
 echo "🏗️  Building Stream Mesh Legacy..."
 
 # Apply fetch fix for legacy compatibility
@@ -57,7 +58,26 @@ npx webpack --config webpack.config.js --mode production
 echo "📁 Copying assets..."
 node scripts/copy-obs-assets.js
 echo "⚡ Building Electron application..."
-npx electron-builder --config electron-builder-legacy.json --mac
+echo "DEBUG: Current directory: $(pwd)"
+echo "DEBUG: Node version: $(node --version)"
+echo "DEBUG: Available disk space: $(df -h .)"
+
+# Set environment variables for better CI compatibility
+export CI=true
+export USE_HARD_LINKS=false
+
+# Run electron-builder with explicit DMG creation
+echo "📦 Creating DMG installer..."
+npx electron-builder --config electron-builder-legacy.json --mac --publish=never
+
+# Verify DMG was created
+if [ -f "release-legacy/Stream Mesh Catalina-"*.dmg ]; then
+    echo "✅ DMG created successfully!"
+    ls -la release-legacy/*.dmg
+else
+    echo "❌ DMG creation failed!"
+    exit 1
+fi
 
 # Restore original main.ts
 if [ -f "src/main.ts.backup" ]; then
