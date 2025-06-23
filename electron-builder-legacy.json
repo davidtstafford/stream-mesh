@@ -28,6 +28,8 @@
   "npmRebuild": false,
   "beforeBuild": "scripts/prepare-build.js",
   "afterSign": null,
+  "forceCodeSigning": false,
+  "compression": "normal",
   "mac": {
     "category": "public.app-category.productivity",
     "target": [
@@ -37,11 +39,15 @@
       }
     ],
     "icon": "src/icon.png",
-    "minimumSystemVersion": "10.15.0"
+    "minimumSystemVersion": "10.15.0",
+    "identity": null,
+    "gatekeeperAssess": false
   },
   "dmg": {
     "title": "Stream Mesh Catalina Installer",
     "background": null,
+    "writeUpdateInfo": false,
+    "format": "UDZO",
     "window": {
       "width": 600,
       "height": 400
