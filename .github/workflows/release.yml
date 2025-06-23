@@ -70,14 +70,16 @@ jobs:
       run: |
         cp package-legacy.json package.json
         cp tsconfig-legacy.json tsconfig.json
-    - run: npm ci
+        rm -f package-lock.json  # Remove lock file since versions don't match
+    - run: npm install
     - name: Apply Twitch OAuth fetch fix
       run: |
-        # Apply the same fetch fix as in build-check
+        # Apply the fetch fix to main.ts
         node -e "
         const fs = require('fs');
         const content = fs.readFileSync('src/main.ts', 'utf8');
-        const oldPattern = /\/\/ Fetch the username using the Twitch API\s*const userInfoRes = await fetch\('https:\/\/api\.twitch\.tv\/helix\/users', \{[^}]*\}\);\s*const userInfo = await userInfoRes\.json\(\);/s;
+        // Replace the fetch call with https module
+        const oldPattern = /\/\/ Fetch the username using the Twitch API\s*const userInfoRes = await fetch\('https:\/\/api\.twitch\.tv\/helix\/users', \{[\s\S]*?\}\);\s*const userInfo = await userInfoRes\.json\(\);/;
         const newCode = \`// Fetch the username using the Twitch API (using https module for legacy compatibility)
         const userInfo = await new Promise<any>((resolve, reject) => {
           const https = require('https');
@@ -105,6 +107,11 @@ jobs:
           req.end();
         });\`;
         const newContent = content.replace(oldPattern, newCode);
+        if (newContent === content) {
+          console.log('⚠️  Warning: Fetch fix pattern not found');
+        } else {
+          console.log('✅ Fetch fix applied successfully');
+        }
         fs.writeFileSync('src/main.ts', newContent, 'utf8');
         "
     - run: npm run build
