@@ -1,0 +1,71 @@
+{
+  "appId": "com.streammesh.app.catalina",
+  "productName": "Stream Mesh Catalina",
+  "copyright": "Copyright © 2024 Stream Mesh",
+  "directories": {
+    "output": "release-legacy"
+  },
+  "files": [
+    "dist/**/*",
+    "src/ui/assets/**/*",
+    "src/shared/assets/**/*",
+    "node_modules/aws-sdk/**/*",
+    "node_modules/express/**/*",
+    "!node_modules/**/{test,spec,docs,doc,demo,example,examples,samples}/**/*",
+    "!node_modules/**/{README,readme,CHANGELOG,changelog,LICENSE,license}*",
+    "!node_modules/**/*.{d.ts,map}"
+  ],
+  "asarUnpack": [
+    "node_modules/aws-sdk/**/*"
+  ],
+  "extraMetadata": {
+    "main": "dist/main.js",
+    "type": "commonjs"
+  },
+  "electronVersion": "22.3.27",
+  "nodeGypRebuild": false,
+  "buildDependenciesFromSource": false,
+  "npmRebuild": false,
+  "beforeBuild": "scripts/prepare-build.js",
+  "afterSign": null,
+  "mac": {
+    "category": "public.app-category.productivity",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "src/icon.png",
+    "minimumSystemVersion": "10.15.0"
+  },
+  "dmg": {
+    "title": "Stream Mesh Catalina Installer",
+    "background": null,
+    "window": {
+      "width": 600,
+      "height": 400
+    },
+    "contents": [
+      {
+        "x": 150,
+        "y": 200,
+        "type": "file"
+      },
+      {
+        "x": 450,
+        "y": 200,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "win": {
+    "target": "nsis",
+    "icon": "src/icon.png"
+  },
+  "linux": {
+    "target": "AppImage",
+    "category": "Utility"
+  }
+}

@@ -59,8 +59,65 @@ jobs:
         name: windows-exe
         path: release/*.exe
 
+  build-catalina:
+    runs-on: macos-13  # Intel Mac for Catalina compatibility
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '18'  # Use Node.js 18 for legacy build
+    - name: Setup legacy environment
+      run: |
+        cp package-legacy.json package.json
+        cp tsconfig-legacy.json tsconfig.json
+    - run: npm ci
+    - name: Apply Twitch OAuth fetch fix
+      run: |
+        # Apply the same fetch fix as in build-check
+        node -e "
+        const fs = require('fs');
+        const content = fs.readFileSync('src/main.ts', 'utf8');
+        const oldPattern = /\/\/ Fetch the username using the Twitch API\s*const userInfoRes = await fetch\('https:\/\/api\.twitch\.tv\/helix\/users', \{[^}]*\}\);\s*const userInfo = await userInfoRes\.json\(\);/s;
+        const newCode = \`// Fetch the username using the Twitch API (using https module for legacy compatibility)
+        const userInfo = await new Promise<any>((resolve, reject) => {
+          const https = require('https');
+          const options = {
+            hostname: 'api.twitch.tv',
+            path: '/helix/users',
+            method: 'GET',
+            headers: {
+              'Authorization': \\\`Bearer \\\${accessToken}\\\`,
+              'Client-Id': credentials.client_id,
+            },
+          };
+          const req = https.request(options, (res: any) => {
+            let data = '';
+            res.on('data', (chunk: string) => data += chunk);
+            res.on('end', () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                reject(e);
+              }
+            });
+          });
+          req.on('error', reject);
+          req.end();
+        });\`;
+        const newContent = content.replace(oldPattern, newCode);
+        fs.writeFileSync('src/main.ts', newContent, 'utf8');
+        "
+    - run: npm run build
+    - run: npx electron-builder --config electron-builder-legacy.json --mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: catalina-dmg
+        path: release-legacy/*.dmg
+
   release:
-    needs: [build-intel, build-arm, build-windows]
+    needs: [build-intel, build-arm, build-windows, build-catalina]  # Add build-catalina
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
@@ -81,11 +138,15 @@ jobs:
       with:
         name: windows-exe
         path: ./release/
+    - uses: actions/download-artifact@v4  # Add Catalina DMG download
+      with:
+        name: catalina-dmg
+        path: ./release/
     - run: ls -la ./release/
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release create "v${{ steps.version.outputs.version }}" \
           --title "Stream Mesh v${{ steps.version.outputs.version }}" \
-          --notes "Automated release" \
+          --notes "Automated release - includes Catalina compatibility" \
           ./release/*

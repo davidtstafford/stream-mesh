@@ -137,3 +137,72 @@ jobs:
         echo "Checking for EXE file..."
         if (Test-Path "release\Stream Mesh Setup*.exe") { Write-Host "✅ Windows EXE found" } else { Write-Host "❌ Windows EXE missing"; exit 1 }
       shell: powershell
+
+  build-catalina:
+    needs: security-check
+    runs-on: macos-13  # Intel Mac for Catalina compatibility
+    if: needs.security-check.outputs.safe-to-build == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'  # Use Node.js 18 for legacy build
+    - name: Setup legacy environment
+      run: |
+        cp package-legacy.json package.json
+        cp tsconfig-legacy.json tsconfig.json
+    - name: Install legacy dependencies
+      run: npm ci
+    - name: Apply Twitch OAuth fetch fix
+      run: |
+        # Apply the fetch fix to main.ts
+        node -e "
+        const fs = require('fs');
+        const content = fs.readFileSync('src/main.ts', 'utf8');
+        // Replace the fetch call with https module
+        const oldPattern = /\/\/ Fetch the username using the Twitch API\s*const userInfoRes = await fetch\('https:\/\/api\.twitch\.tv\/helix\/users', \{[^}]*\}\);\s*const userInfo = await userInfoRes\.json\(\);/s;
+        const newCode = \`// Fetch the username using the Twitch API (using https module for legacy compatibility)
+        const userInfo = await new Promise<any>((resolve, reject) => {
+          const https = require('https');
+          const options = {
+            hostname: 'api.twitch.tv',
+            path: '/helix/users',
+            method: 'GET',
+            headers: {
+              'Authorization': \\\`Bearer \\\${accessToken}\\\`,
+              'Client-Id': credentials.client_id,
+            },
+          };
+          const req = https.request(options, (res: any) => {
+            let data = '';
+            res.on('data', (chunk: string) => data += chunk);
+            res.on('end', () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                reject(e);
+              }
+            });
+          });
+          req.on('error', reject);
+          req.end();
+        });\`;
+        const newContent = content.replace(oldPattern, newCode);
+        fs.writeFileSync('src/main.ts', newContent, 'utf8');
+        "
+    - name: Build legacy application
+      run: |
+        npm run build
+        npx electron-builder --config electron-builder-legacy.json --mac
+    - name: Verify Catalina DMG
+      run: |
+        ls -la release-legacy/
+        echo "Checking for Catalina DMG..."
+        if find release-legacy/ -name "*Catalina*.dmg" | grep -q .; then 
+          echo "✅ Catalina DMG found"
+        else 
+          echo "❌ Catalina DMG missing"
+          exit 1
+        fi

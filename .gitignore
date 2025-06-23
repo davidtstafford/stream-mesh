@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 release/
+release-legacy/
 *.log
 *.tsbuildinfo
 *.dmg
@@ -57,6 +58,9 @@ yarn-error.log*
 !package.json
 !package-lock.json
 !tsconfig.json
+!package-legacy.json
+!tsconfig-legacy.json
+!electron-builder-legacy.json
 
 # Ignore installer output
 *.exe
