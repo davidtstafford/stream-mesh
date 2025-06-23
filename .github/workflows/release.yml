@@ -59,8 +59,33 @@ jobs:
         name: windows-exe
         path: release/*.exe
 
+  build-catalina:
+    runs-on: macos-13  # Intel Mac for Catalina compatibility
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '18'  # Use Node.js 18 for legacy build
+    - name: Setup legacy environment
+      run: |
+        cp package-legacy.json package.json
+        cp tsconfig-legacy.json tsconfig.json
+        rm -f package-lock.json  # Remove lock file since versions don't match
+    - run: npm install
+    - name: Apply Twitch OAuth fetch fix and build
+      run: |
+        # Use our existing build script which handles the fetch fix properly
+        chmod +x scripts/build-legacy.sh
+        ./scripts/build-legacy.sh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: catalina-dmg
+        path: release-legacy/*.dmg
+
   release:
-    needs: [build-intel, build-arm, build-windows]
+    needs: [build-intel, build-arm, build-windows, build-catalina]  # Add build-catalina
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
@@ -81,11 +106,15 @@ jobs:
       with:
         name: windows-exe
         path: ./release/
+    - uses: actions/download-artifact@v4  # Add Catalina DMG download
+      with:
+        name: catalina-dmg
+        path: ./release/
     - run: ls -la ./release/
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release create "v${{ steps.version.outputs.version }}" \
           --title "Stream Mesh v${{ steps.version.outputs.version }}" \
-          --notes "Automated release" \
+          --notes "Automated release - includes Catalina compatibility" \
           ./release/*

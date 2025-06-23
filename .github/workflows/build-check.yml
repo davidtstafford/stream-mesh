@@ -137,3 +137,37 @@ jobs:
         echo "Checking for EXE file..."
         if (Test-Path "release\Stream Mesh Setup*.exe") { Write-Host "✅ Windows EXE found" } else { Write-Host "❌ Windows EXE missing"; exit 1 }
       shell: powershell
+
+  build-catalina:
+    needs: security-check
+    runs-on: macos-13  # Intel Mac for Catalina compatibility
+    if: needs.security-check.outputs.safe-to-build == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'  # Use Node.js 18 for legacy build
+    - name: Setup legacy environment
+      run: |
+        cp package-legacy.json package.json
+        cp tsconfig-legacy.json tsconfig.json
+        rm -f package-lock.json  # Remove lock file since versions don't match
+    - name: Install legacy dependencies
+      run: npm install
+    - name: Apply Twitch OAuth fetch fix and build
+      run: |
+        # Use our existing build script which handles the fetch fix properly
+        chmod +x scripts/build-legacy.sh
+        ./scripts/build-legacy.sh
+    - name: Verify Catalina DMG
+      run: |
+        ls -la release-legacy/
+        echo "Checking for Catalina DMG..."
+        if find release-legacy/ -name "*Catalina*.dmg" | grep -q .; then 
+          echo "✅ Catalina DMG found"
+        else 
+          echo "❌ Catalina DMG missing"
+          exit 1
+        fi
