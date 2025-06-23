@@ -156,66 +156,11 @@ jobs:
         rm -f package-lock.json  # Remove lock file since versions don't match
     - name: Install legacy dependencies
       run: npm install
-    - name: Apply Twitch OAuth fetch fix
+    - name: Apply Twitch OAuth fetch fix and build
       run: |
-        # Apply the fetch fix to main.ts
-        node -e "
-        const fs = require('fs');
-        const content = fs.readFileSync('src/main.ts', 'utf8');
-        // Replace the fetch call with https module
-        const oldPattern = /\/\/ Fetch the username using the Twitch API\s*const userInfoRes = await fetch\('https:\/\/api\.twitch\.tv\/helix\/users', \{[\s\S]*?\}\);\s*const userInfo = await userInfoRes\.json\(\);/;
-        const newCode = \`// Fetch the username using the Twitch API (using https module for legacy compatibility)
-        const userInfo = await new Promise<any>((resolve, reject) => {
-          const https = require('https');
-          const options = {
-            hostname: 'api.twitch.tv',
-            path: '/helix/users',
-            method: 'GET',
-            headers: {
-              'Authorization': \\\`Bearer \\\${accessToken}\\\`,
-              'Client-Id': credentials.client_id,
-            },
-          };
-          const req = https.request(options, (res: any) => {
-            let data = '';
-            res.on('data', (chunk: string) => data += chunk);
-            res.on('end', () => {
-              try {
-                resolve(JSON.parse(data));
-              } catch (e) {
-                reject(e);
-              }
-            });
-          });
-          req.on('error', reject);
-          req.end();
-        });\`;
-        const newContent = content.replace(oldPattern, newCode);
-        if (newContent === content) {
-          console.log('⚠️  Warning: Fetch fix pattern not found');
-        } else {
-          console.log('✅ Fetch fix applied successfully');
-        }
-        fs.writeFileSync('src/main.ts', newContent, 'utf8');
-        "
-            res.on('end', () => {
-              try {
-                resolve(JSON.parse(data));
-              } catch (e) {
-                reject(e);
-              }
-            });
-          });
-          req.on('error', reject);
-          req.end();
-        });\`;
-        const newContent = content.replace(oldPattern, newCode);
-        fs.writeFileSync('src/main.ts', newContent, 'utf8');
-        "
-    - name: Build legacy application
-      run: |
-        npm run build
-        npx electron-builder --config electron-builder-legacy.json --mac
+        # Use our existing build script which handles the fetch fix properly
+        chmod +x scripts/build-legacy.sh
+        ./scripts/build-legacy.sh
     - name: Verify Catalina DMG
       run: |
         ls -la release-legacy/
