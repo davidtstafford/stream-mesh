@@ -46,10 +46,15 @@ export class KickWebhookRelayService extends EventEmitter {
    */
   async checkAvailability(): Promise<boolean> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(this.config.healthCheckUrl, {
         method: 'GET',
-        timeout: 5000
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
       console.log('[KickWebhookRelay] Service not available:', error);
@@ -124,10 +129,15 @@ export class KickWebhookRelayService extends EventEmitter {
   private async wakeRelayService(): Promise<void> {
     console.log('[KickWebhookRelay] Waking relay service...');
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
     const response = await fetch(this.config.healthCheckUrl, {
       method: 'GET',
-      timeout: 10000 // Give it time to wake up
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`Failed to wake relay service: ${response.status}`);

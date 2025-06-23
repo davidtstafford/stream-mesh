@@ -212,9 +212,7 @@ const EventHistory: React.FC = () => {
         
         <div>
           <label style={{ display: 'block', marginBottom: 4, fontSize: 14, color: '#aaa' }}>Platform</label>
-          <input 
-            type="text"
-            placeholder="Platform" 
+          <select 
             value={filterPlatform} 
             onChange={e => setFilterPlatform(e.target.value)}
             style={{ 
@@ -225,7 +223,11 @@ const EventHistory: React.FC = () => {
               background: '#333', 
               color: '#fff' 
             }} 
-          />
+          >
+            <option value="">All Platforms</option>
+            <option value="twitch">🟣 Twitch</option>
+            <option value="kick">🥊 KICK</option>
+          </select>
         </div>
         
         <div>

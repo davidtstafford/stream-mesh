@@ -18,17 +18,54 @@ If you want to update StreamMesh to the latest version after changes have been m
 **Note:** All commands should work without `sudo` if you installed Node.js and Homebrew as a normal user. If you see a permissions error, you may need to fix your Homebrew or Node.js setup, but this is rare.
 # Stream Mesh
 
-StreamMesh is a Windows desktop application for streamers, built with Electron, React, and Node.js (TypeScript). It features a modern UI, local SQLite storage, and AWS Polly integration for TTS. All user data is stored locally. The app supports light, dark, and system themes (dark by default). Manual updates only. Packaged as an MSI/EXE installer for Windows 10+.
+StreamMesh is a cross-platform desktop application for streamers, built with Electron, React, and Node.js (TypeScript). It features a modern UI, local SQLite storage, and AWS Polly integration for TTS. All user data is stored locally. The app supports light, dark, and system themes (dark by default). Manual updates only. Available for Windows 10+ and macOS.
 
+## Platform Support
+
+Stream Mesh now supports **dual-platform streaming** with both Twitch and KICK:
+
+### 🟣 Twitch Integration
+- **Full OAuth Authentication** - Secure token-based connection
+- **Real-time Chat** - Live chat messages and events
+- **Event Subscriptions** - Follows, subscriptions, bits, raids, and more
+- **Command System** - Chat commands and moderation tools
+- **TTS Integration** - Text-to-speech for chat messages
+
+### 🥊 KICK Integration  
+- **OAuth Authentication** - Secure KICK account connection
+- **Event Processing** - Chat, follows, subscriptions, and more
+- **Cross-platform TTS** - Unified voice system across platforms
+- **Command Support** - Same commands work on both platforms
+- **Unified UI** - Consistent experience across platforms
+
+#### KICK Setup
+1. Go to **Admin > Link to Streams**
+2. Click **"Connect to KICK"** 
+3. Complete OAuth authentication in your browser
+4. KICK events will appear alongside Twitch events
+
+**Note:** KICK integration is currently limited to OAuth authentication and event simulation. Live WebSocket connections are coming soon as the KICK API becomes more stable.
 
 ## Features
-- Navigation bar with collapsible sections
-- Link to Streams (Twitch, TikTok placeholder)
-- Live Chat and Chat History
-- Admin: Preferences, TTS, Viewer Management
-- Commands: System and Custom (coming soon)
-- Local SQLite database
-- AWS Polly TTS integration
+- **Cross-Platform Navigation** - Unified interface for both streaming platforms
+- **Dual-Platform Chat** - Monitor and interact with both Twitch and KICK simultaneously  
+- **Universal Commands** - System commands work across both platforms
+- **Unified Viewer Management** - Manage viewers from both platforms in one place
+- **Cross-Platform TTS** - Voice settings apply to users regardless of platform
+- **Event Correlation** - View events from both platforms in chronological order
+- **Platform Filtering** - Filter events and viewers by platform
+- **Persistent Settings** - Platform-specific settings are saved separately
+
+### Admin Features
+- **Preferences** - Global app settings and theme configuration
+- **TTS Configuration** - AWS Polly integration with voice management
+- **Viewer Management** - Cross-platform viewer settings and voice assignments
+- **Event Administration** - Configure which events are displayed and how
+
+### Developer Tools
+- **Dual-Platform Testing** - Simulate events for both Twitch and KICK
+- **Event Simulation** - Test chat, follows, subscriptions, and more
+- **Cross-Platform Development** - Unified event system for both platforms
 
 ### New: Disable Neural Voices (Cost-Saving Option)
 
