@@ -561,14 +561,32 @@ app.whenReady().then(async () => {
     try {
       const accessToken = await startTwitchOAuth(win, credentials);
       console.log('Twitch OAuth accessToken:', accessToken);
-      // Fetch the username using the Twitch API
-      const userInfoRes = await fetch('https://api.twitch.tv/helix/users', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Client-Id': credentials.client_id,
-        },
+      // Fetch the username using the Twitch API (using https module for legacy compatibility)
+      const userInfo = await new Promise<any>((resolve, reject) => {
+        const https = require('https');
+        const options = {
+          hostname: 'api.twitch.tv',
+          path: '/helix/users',
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Client-Id': credentials.client_id,
+          },
+        };
+        const req = https.request(options, (res: any) => {
+          let data = '';
+          res.on('data', (chunk: string) => data += chunk);
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+        req.on('error', reject);
+        req.end();
       });
-      const userInfo = await userInfoRes.json();
       console.log('Twitch userInfo response:', userInfo);
       const username = userInfo.data && userInfo.data[0] && userInfo.data[0].login;
       if (!username) throw new Error('Could not fetch Twitch username');
