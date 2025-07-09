@@ -16,6 +16,23 @@ import { commandProcessor } from './backend/services/commandProcessor';
 // Use require for Node.js built-in modules and potentially problematic packages
 const fs = require('fs');
 const express = require('express') as typeof import('express');
+const os = require('os');
+
+// Function to get the local IP address
+function getLocalIPAddress(): string {
+  const interfaces = os.networkInterfaces();
+  for (const devName in interfaces) {
+    const iface = interfaces[devName];
+    if (iface) {
+      for (const alias of iface) {
+        if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+          return alias.address;
+        }
+      }
+    }
+  }
+  return 'localhost'; // Fallback to localhost if no IP found
+}
 
 const userDataPath = app.getPath('userData');
 const authFilePath = path.join(userDataPath, 'auth.json');
@@ -674,6 +691,11 @@ app.whenReady().then(async () => {
     return getPollyConfig();
   });
 
+  // Network utility handlers
+  ipcMain.handle('network:getLocalIP', async () => {
+    return getLocalIPAddress();
+  });
+
   // TTS settings IPC handlers
   ipcMain.handle('tts:getSettings', async () => {
     return loadTTSSettings();
@@ -1107,8 +1129,10 @@ app.whenReady().then(async () => {
     }
   });
   registerObsOverlayEndpoints(overlayServer);
-  overlayServer.listen(3001, () => {
-    console.log('Overlay server running on http://localhost:3001');
+  overlayServer.listen(3001, '0.0.0.0', () => {
+    const localIP = getLocalIPAddress();
+    console.log(`Overlay server running on http://localhost:3001`);
+    console.log(`Overlay server accessible from network at http://${localIP}:3001`);
   });
 
   // Only create the window after all handlers are registered
@@ -1210,5 +1234,16 @@ process.on('unhandledRejection', (reason, promise) => {
     } catch (err) {
       console.error('twitch:deleteCredentials error:', err);
       throw err;
+    }
+  });
+
+  // Get local IP address handler
+  ipcMain.handle('system:getLocalIPAddress', async () => {
+    try {
+      const ipAddress = getLocalIPAddress();
+      return { success: true, ipAddress };
+    } catch (err) {
+      console.error('system:getLocalIPAddress error:', err);
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   });

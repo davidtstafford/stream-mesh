@@ -4,15 +4,31 @@ import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 const OBS: React.FC = () => {
   const { getResponsiveContainerStyle } = useResponsiveLayout();
 
+  // State for IP address
+  const [localIP, setLocalIP] = React.useState<string>('localhost');
+
+  // Fetch local IP address on component mount
+  React.useEffect(() => {
+    const fetchIP = async () => {
+      try {
+        const ip = await (window as any).electron.ipcRenderer.invoke('network:getLocalIP');
+        setLocalIP(ip);
+      } catch (error) {
+        console.error('Failed to fetch local IP:', error);
+        setLocalIP('localhost'); // Fallback to localhost
+      }
+    };
+    fetchIP();
+  }, []);
 
   // Chat overlay logic
-  const chatUrl = 'http://localhost:3001/obs/chat';
+  const chatUrl = `http://${localIP}:3001/obs/chat`;
   const [copiedChat, setCopiedChat] = React.useState(false);
   const [connectionsChat, setConnectionsChat] = React.useState<number | null>(null);
   React.useEffect(() => {
     let cancelled = false;
     const fetchConnections = () => {
-      fetch('http://localhost:3001/obs/chat/connections')
+      fetch(`http://${localIP}:3001/obs/chat/connections`)
         .then((res) => res.json())
         .then((data) => {
           if (!cancelled) setConnectionsChat(typeof data.connections === 'number' ? data.connections : null);
@@ -24,7 +40,7 @@ const OBS: React.FC = () => {
     fetchConnections();
     const interval = setInterval(fetchConnections, 3000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [localIP]);
   const handleCopyChat = () => {
     navigator.clipboard.writeText(chatUrl);
     setCopiedChat(true);
@@ -32,13 +48,13 @@ const OBS: React.FC = () => {
   };
 
   // TTS overlay logic
-  const ttsUrl = 'http://localhost:3001/obs/tts';
+  const ttsUrl = `http://${localIP}:3001/obs/tts`;
   const [copiedTTS, setCopiedTTS] = React.useState(false);
   const [connectionsTTS, setConnectionsTTS] = React.useState<number | null>(null);
   React.useEffect(() => {
     let cancelled = false;
     const fetchConnections = () => {
-      fetch('http://localhost:3001/obs/tts/connections')
+      fetch(`http://${localIP}:3001/obs/tts/connections`)
         .then((res) => res.json())
         .then((data) => {
           if (!cancelled) setConnectionsTTS(typeof data.connections === 'number' ? data.connections : null);
@@ -50,7 +66,7 @@ const OBS: React.FC = () => {
     fetchConnections();
     const interval = setInterval(fetchConnections, 3000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [localIP]);
   const handleCopyTTS = () => {
     navigator.clipboard.writeText(ttsUrl);
     setCopiedTTS(true);
@@ -60,6 +76,26 @@ const OBS: React.FC = () => {
   return (
     <div style={{ ...getResponsiveContainerStyle(600), color: '#fff' }}>
       <h2 style={{ marginTop: 24 }}>OBS Integration</h2>
+
+      {/* IP Address Information */}
+      <div style={{ 
+        background: '#2a2a2a', 
+        border: '1px solid #444', 
+        borderRadius: 8, 
+        padding: 16, 
+        marginBottom: 24,
+        fontSize: 14
+      }}>
+        <div style={{ marginBottom: 8 }}>
+          <strong style={{ color: '#3a8dde' }}>Network Information:</strong>
+        </div>
+        <div style={{ color: '#aaa' }}>
+          Local IP Address: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{localIP}</span>
+        </div>
+        <div style={{ color: '#aaa', marginTop: 8, fontSize: 12 }}>
+          💡 This IP address allows OBS on other devices to connect to your Stream Mesh overlays.
+        </div>
+      </div>
 
       {/* Chat Overlay Section */}
       <h3 style={{ marginTop: 32 }}>Chat Overlay</h3>
