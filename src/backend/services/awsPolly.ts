@@ -17,21 +17,38 @@ export interface PollyConfig {
 
 let polly: Polly | null = null;
 let pollyConfig: PollyConfig | null = null;
+let lastSuccessfulRequest = Date.now();
+let consecutiveErrors = 0;
 
 const configFilePath = path.join(app.getPath('userData'), 'ttsConfig.json');
 
 export function configurePolly(config: PollyConfig) {
   pollyConfig = config;
+  
+  // Add timeout and retry configuration for Catalina compatibility
   polly = new Polly({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
     region: config.region,
+    httpOptions: {
+      timeout: 30000, // 30 second timeout
+      connectTimeout: 10000, // 10 second connection timeout
+    },
+    maxRetries: 3,
+    retryDelayOptions: {
+      base: 1000, // Start with 1 second delay
+    }
   });
+  
+  // Reset error tracking on new config
+  consecutiveErrors = 0;
+  lastSuccessfulRequest = Date.now();
+  
   // Persist config to disk, including voiceId and engine
   try {
     fs.writeFileSync(configFilePath, JSON.stringify(config, null, 2), 'utf-8');
   } catch (err) {
-    // Optionally, handle error silently or log minimal error
+    console.warn('[Polly] Failed to save config:', err);
   }
 }
 
@@ -40,11 +57,12 @@ export function getPollyConfig(): PollyConfig | null {
     const data = fs.readFileSync(configFilePath, 'utf-8');
     const config = JSON.parse(data);
     pollyConfig = config;
-    polly = new Polly({
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-      region: config.region,
-    });
+    
+    if (!polly) {
+      // Reconfigure Polly if it wasn't initialized
+      configurePolly(config);
+    }
+    
     return pollyConfig;
   } catch (err) {
     return null;
@@ -57,9 +75,21 @@ function getFirstEngineForVoice(voiceId?: string): string {
   return found && found.Engines && found.Engines.length > 0 ? found.Engines[0] : 'standard';
 }
 
-
 export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string): Promise<string> {
-  if (!polly || !pollyConfig) throw new Error('Polly is not configured');
+  if (!polly || !pollyConfig) {
+    throw new Error('Polly is not configured');
+  }
+
+  // Check for too many consecutive errors (circuit breaker)
+  if (consecutiveErrors >= 5) {
+    const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
+    if (timeSinceLastSuccess < 5 * 60 * 1000) { // 5 minutes
+      throw new Error('TTS temporarily unavailable due to repeated errors');
+    } else {
+      // Reset after 5 minutes
+      consecutiveErrors = 0;
+    }
+  }
 
   // Load TTS settings to check for neural voice restriction
   let disableNeuralVoices = false;
@@ -91,44 +121,77 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
     }
   }
 
-  // Platform check
-  const os = require('os');
-  const isWindows = os.platform() === 'win32';
-  const userDataDir = app.getPath('userData');
-  let filePath: string;
-  let result;
-  if (isWindows) {
-    // Synthesize as PCM and wrap as WAV
-    const params: Polly.SynthesizeSpeechInput = {
-      OutputFormat: 'pcm',
-      Text: text,
-      VoiceId: resolvedVoiceId,
-      TextType: 'text',
-      Engine: resolvedEngine as any,
-      SampleRate: '16000', // 16kHz is widely supported
-    };
-    result = await polly.synthesizeSpeech(params).promise();
-    if (!result.AudioStream) throw new Error('No audio stream returned');
-    filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.wav`);
-    // Write WAV header + PCM data
-    const pcmBuffer = Buffer.from(result.AudioStream as Buffer);
-    const wavBuffer = pcmToWav(pcmBuffer, 16000, 1);
-    fs.writeFileSync(filePath, wavBuffer);
-  } else {
-    // Synthesize as MP3 for browser/OBS compatibility
-    const params: Polly.SynthesizeSpeechInput = {
-      OutputFormat: 'mp3',
-      Text: text,
-      VoiceId: resolvedVoiceId,
-      TextType: 'text',
-      Engine: resolvedEngine as any,
-    };
-    result = await polly.synthesizeSpeech(params).promise();
-    if (!result.AudioStream) throw new Error('No audio stream returned');
-    filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.mp3`);
-    fs.writeFileSync(filePath, Buffer.from(result.AudioStream as Buffer));
+  try {
+    // Platform check
+    const os = require('os');
+    const isWindows = os.platform() === 'win32';
+    const userDataDir = app.getPath('userData');
+    let filePath: string;
+    let result;
+    if (isWindows) {
+      // Synthesize as PCM and wrap as WAV
+      const params: Polly.SynthesizeSpeechInput = {
+        OutputFormat: 'pcm',
+        Text: text,
+        VoiceId: resolvedVoiceId,
+        TextType: 'text',
+        Engine: resolvedEngine as any,
+        SampleRate: '16000', // 16kHz is widely supported
+      };
+      result = await polly.synthesizeSpeech(params).promise();
+      if (!result.AudioStream) throw new Error('No audio stream returned');
+      filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.wav`);
+      // Write WAV header + PCM data
+      const pcmBuffer = Buffer.from(result.AudioStream as Buffer);
+      const wavBuffer = pcmToWav(pcmBuffer, 16000, 1);
+      fs.writeFileSync(filePath, wavBuffer);
+    } else {
+      // Synthesize as MP3 for browser/OBS compatibility
+      const params: Polly.SynthesizeSpeechInput = {
+        OutputFormat: 'mp3',
+        Text: text,
+        VoiceId: resolvedVoiceId,
+        TextType: 'text',
+        Engine: resolvedEngine as any,
+      };
+      result = await polly.synthesizeSpeech(params).promise();
+      if (!result.AudioStream) throw new Error('No audio stream returned');
+      filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.mp3`);
+      fs.writeFileSync(filePath, Buffer.from(result.AudioStream as Buffer));
+    }
+    
+    // Success - reset error tracking
+    consecutiveErrors = 0;
+    lastSuccessfulRequest = Date.now();
+    
+    return filePath;
+  } catch (error) {
+    // Track errors for circuit breaker
+    consecutiveErrors++;
+    console.error('[Polly] Synthesis error:', error);
+    
+    // Provide more specific error messages
+    if (error && typeof error === 'object' && 'code' in error) {
+      const awsError = error as any;
+      switch (awsError.code) {
+        case 'InvalidAccessKeyId':
+        case 'SignatureDoesNotMatch':
+          throw new Error('AWS credentials are invalid. Please check your Access Key ID and Secret Access Key.');
+        case 'TokenRefreshRequired':
+          throw new Error('AWS session expired. Please reconfigure your credentials.');
+        case 'Throttling':
+        case 'ThrottledException':
+          throw new Error('AWS API rate limit exceeded. Please wait a moment and try again.');
+        case 'NetworkingError':
+        case 'TimeoutError':
+          throw new Error('Network connection failed. Please check your internet connection.');
+        default:
+          throw new Error(`AWS Polly error: ${awsError.message || awsError.code}`);
+      }
+    }
+    
+    throw error;
   }
-  return filePath;
 }
 
 // Helper: Wrap PCM buffer in a WAV header

@@ -268,19 +268,54 @@ function createWindow() {
   }
 }
 
+// Cleanup and error handling improvements
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startPeriodicCleanup() {
+  // Clean up temp files every 10 minutes
+  cleanupInterval = setInterval(() => {
+    try {
+      cleanUpTempTTSFiles();
+    } catch (err) {
+      console.warn('[Main] Error during periodic cleanup:', err);
+    }
+  }, 10 * 60 * 1000);
+}
+
+function stopPeriodicCleanup() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
+
 function cleanUpTempTTSFiles() {
-  const userDataDir = app.getPath('userData');
-  const files = fs.readdirSync(userDataDir);
-  for (const file of files) {
-    // Only delete files that match the temp TTS pattern (mp3 or wav, for legacy)
-    if (/^streammesh_tts_\d+\.(mp3|wav)$/.test(file)) {
-      try {
-        fs.unlinkSync(path.join(userDataDir, file));
-        console.log('[cleanup] Deleted temp TTS file:', file);
-      } catch (err) {
-        console.warn('[cleanup] Failed to delete temp TTS file:', file, err);
+  try {
+    const userDataDir = app.getPath('userData');
+    if (!fs.existsSync(userDataDir)) return;
+    
+    const files = fs.readdirSync(userDataDir);
+    const now = Date.now();
+    
+    for (const file of files) {
+      // Only delete files that match the temp TTS pattern (mp3 or wav, for legacy)
+      if (/^streammesh_tts_\d+\.(mp3|wav)$/.test(file)) {
+        try {
+          const filePath = path.join(userDataDir, file);
+          const stats = fs.statSync(filePath);
+          
+          // Delete files older than 30 minutes (aggressive cleanup for Catalina)
+          if (now - stats.mtime.getTime() > 30 * 60 * 1000) {
+            fs.unlinkSync(filePath);
+            console.log('[cleanup] Deleted old temp TTS file:', file);
+          }
+        } catch (err) {
+          console.warn('[cleanup] Failed to delete temp TTS file:', file, err);
+        }
       }
     }
+  } catch (err) {
+    console.warn('[cleanup] Error during cleanup:', err);
   }
 }
 
@@ -311,6 +346,7 @@ function filterLargeNumbers(text: string, skip: boolean, threshold: number = 6):
 
 app.whenReady().then(async () => {
   cleanUpTempTTSFiles();
+  startPeriodicCleanup(); // Start periodic cleanup for Catalina stability
   initDatabase();
   registerEventBusDbListener();
   
@@ -1146,6 +1182,16 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  console.log('[Main] App shutting down, cleaning up...');
+  stopPeriodicCleanup();
+  
+  // Clean up TTS queue
+  try {
+    ttsQueue.destroy();
+  } catch (err) {
+    console.warn('[Main] Error destroying TTS queue:', err);
+  }
+  
   cleanUpTempTTSFiles();
 });
 

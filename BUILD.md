@@ -110,6 +110,40 @@ npm run electron-rebuild
 - Windows icons should be 256x256 PNG or ICO format
 - Place icons in `src/` directory and update `package.json` paths
 
+## macOS Catalina Support
+
+### ⚠️ Important: Clean Installation Required
+
+**Before installing any new version**, especially on Catalina, users should follow the [CLEAN-INSTALL-GUIDE.md](CLEAN-INSTALL-GUIDE.md) to remove all previous app data and prevent memory leak issues.
+
+### Catalina Legacy Build
+For macOS Catalina (10.15.x) users, use the legacy build:
+```bash
+./scripts/build-legacy.sh
+```
+
+This creates `Stream Mesh Catalina-2.1.0.dmg` in the `release-legacy/` directory with:
+- Backward compatible Electron version (22.3.27)
+- Legacy Node.js compatibility fixes (Twitch OAuth)
+- Memory leak fixes and automatic temp file cleanup
+- TTS timeout protection for older macOS
+- Optimized memory management for older macOS
+
+### Known Catalina Issues
+
+#### TTS Stops Working After 5+ Hours
+- **Cause**: Memory leaks and network timeouts on older Node.js
+- **Solution**: Restart the app every 3-4 hours during long streams
+- **Prevention**: Use the legacy build and follow the troubleshooting guide
+
+#### Diagnostic Tool
+Run the diagnostic script to check for issues:
+```bash
+./scripts/diagnose-catalina.sh
+```
+
+For detailed troubleshooting, see [CATALINA-TROUBLESHOOTING.md](CATALINA-TROUBLESHOOTING.md).
+
 ## Distribution
 
 ### macOS
