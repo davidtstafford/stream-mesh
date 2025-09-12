@@ -1110,6 +1110,7 @@ app.whenReady().then(async () => {
           user: event.user,
           voiceId, // If set, will override default
           muteNative,
+          emotes: event.tags?.emotes,
         });
       });
     }

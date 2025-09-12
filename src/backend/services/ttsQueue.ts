@@ -12,6 +12,7 @@ interface TTSQueueItem {
   engine?: string;
   user?: string;
   muteNative?: boolean;
+  emotes?: any; // Twitch emote metadata
 }
 
 class TTSQueue extends EventEmitter {
@@ -122,7 +123,7 @@ class TTSQueue extends EventEmitter {
         
         // Add timeout for synthesis to prevent hanging on Catalina
         const filePath = await Promise.race([
-          synthesizeSpeech(item.text, item.voiceId || config.voiceId),
+          synthesizeSpeech(item.text, item.voiceId || config.voiceId, undefined, item.emotes),
           new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('TTS synthesis timeout')), 30000)
           )

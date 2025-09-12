@@ -34,6 +34,12 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     setMuteWhenActiveSource,
     disableNeuralVoices,
     setDisableNeuralVoices,
+  enableEmojis,
+  setEnableEmojis,
+  enableEmotes,
+  setEnableEmotes,
+  maxRepeatedEmotes,
+  setMaxRepeatedEmotes,
   } = useTTSSettings();
 
   // Handlers
@@ -140,18 +146,65 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
         </span>
       </div>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated emojis</div>
-        <input
-          type="number"
-          min={1}
-          max={10}
-          value={maxRepeatedEmojis}
-          onChange={e => setMaxRepeatedEmojis(Number(e.target.value))}
-          style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
-        />
-        <span style={{ color: '#aaa' }}>
-          Example: <b>😂😂😂😂😂</b> → <b>😂😂😂</b> (if limit is 3)
-        </span>
+        <label>
+          <input
+            type="checkbox"
+            checked={enableEmojis}
+            onChange={e => setEnableEmojis(e.target.checked)}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          Enable emojis in TTS
+        </label>
+        <div style={{ color: '#aaa', marginTop: 4 }}>
+          When enabled, emojis will be read out in TTS. When disabled, all emojis will be skipped.
+        </div>
+        {enableEmojis && (
+          <div style={{ marginTop: 8, marginLeft: 24 }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated emojis</div>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={maxRepeatedEmojis}
+              onChange={e => setMaxRepeatedEmojis(Number(e.target.value))}
+              style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
+            />
+            <span style={{ color: '#aaa' }}>
+              Example: <b>😂😂😂😂😂</b> → <b>😂😂😂</b> (if limit is 3)
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={enableEmotes}
+            onChange={e => setEnableEmotes(e.target.checked)}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          Enable emotes in TTS
+        </label>
+        <div style={{ color: '#aaa', marginTop: 4 }}>
+          When enabled, Twitch emotes will be read out in TTS. When disabled, all emotes will be skipped.
+        </div>
+        {enableEmotes && (
+          <div style={{ marginTop: 8, marginLeft: 24 }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated emotes</div>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={maxRepeatedEmotes}
+              onChange={e => setMaxRepeatedEmotes(Number(e.target.value))}
+              style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
+            />
+            <span style={{ color: '#aaa' }}>
+              Example: <b>Kappa Kappa Kappa Kappa</b> → <b>Kappa Kappa Kappa</b> (if limit is 3)
+            </span>
+          </div>
+        )}
       </div>
       <div style={{ marginBottom: 16 }}>
         <label>
@@ -167,16 +220,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
           (Ignores numbers longer than 6 digits)
         </span>
       </div>
-      <div style={{ marginTop: 24 }}>
-        <button
-          style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={() => handleSave()}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save TTS Settings'}
-        </button>
-        {status && <div style={{ color: status === 'TTS settings saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{status}</div>}
-      </div>
+  {/* Settings are now saved automatically on change. */}
     </div>
   );
 };
