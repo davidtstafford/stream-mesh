@@ -35,6 +35,115 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
+    // ~viewervoice command
+    const viewerVoiceCommand: SystemCommand = {
+      command: '~viewervoice',
+      enabled: true,
+      description: 'Show another user\'s current TTS voice: ~viewervoice @username',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~viewervoice part
+          if (args.length < 1) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~viewervoice @username`,
+              '~viewervoice',
+              event.platform
+            );
+            return;
+          }
+          const mention = args[0];
+          if (!mention.startsWith('@')) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~viewervoice @username`,
+              '~viewervoice',
+              event.platform
+            );
+            return;
+          }
+          const targetUsername = mention.replace(/^@/, '');
+
+          // Find the Twitch user ID for the tagged user from tags or DB
+          let targetUserId = null;
+          if (event.tags && event.tags['mentions']) {
+            const mentions = event.tags['mentions'].split(',');
+            if (mentions.length === 1) {
+              targetUserId = mentions[0];
+            } else if (event.tags['msg-param-recipient-id']) {
+              targetUserId = event.tags['msg-param-recipient-id'];
+            }
+          }
+          if (!targetUserId) {
+            const { db } = require('../core/database');
+            const row = await new Promise<any>((resolve) => {
+              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+                resolve(row);
+              });
+            });
+            if (row && row.platform_key) {
+              targetUserId = row.platform_key;
+            }
+          }
+          if (!targetUserId) {
+            await this.sendCommandResponse(
+              `@${event.user} Could not find user @${targetUsername}.`,
+              '~viewervoice',
+              event.platform
+            );
+            return;
+          }
+
+          // Compute viewerKey for DB
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${targetUserId}`).digest('hex').slice(0, 12);
+          // Fetch user's voice setting from database
+          const { fetchViewerSettings } = require('../core/database');
+          const settings = await new Promise<any[]>((resolve, reject) => {
+            fetchViewerSettings(viewerKey, (err: Error | null, rows?: any[]) => {
+              if (err) reject(err);
+              else resolve(rows || []);
+            });
+          });
+          const voiceSetting = settings.find(s => s.key === 'voice');
+          const currentVoice = voiceSetting?.value;
+          if (!currentVoice || currentVoice === '') {
+            await this.sendCommandResponse(
+              `@${event.user} @${targetUsername} hasn't set a custom TTS voice yet.`,
+              '~viewervoice',
+              event.platform
+            );
+            return;
+          }
+          // Find voice details
+          const allVoices = pollyVoiceEngines as any[];
+          const voiceDetails = allVoices.find(v => v.Name === currentVoice);
+          if (voiceDetails) {
+            await this.sendCommandResponse(
+              `@${event.user} @${targetUsername}'s TTS voice is set to ${voiceDetails.Name} (${voiceDetails.LanguageName}).`,
+              '~viewervoice',
+              event.platform
+            );
+          } else {
+            await this.sendCommandResponse(
+              `@${event.user} @${targetUsername}'s TTS voice is set to ${currentVoice}, but this voice is no longer available.`,
+              '~viewervoice',
+              event.platform
+            );
+          }
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~viewervoice command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to fetch viewer voice.`,
+            '~viewervoice',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~viewervoice', viewerVoiceCommand);
     // ~setviewervoice command (supermod only)
     const setViewerVoiceCommand: SystemCommand = {
       command: '~setviewervoice',
