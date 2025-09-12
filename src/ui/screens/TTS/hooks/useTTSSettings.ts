@@ -9,6 +9,7 @@ export interface TTSSettings {
   skipLargeNumbers?: boolean;
   muteWhenActiveSource?: boolean;
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
+  enableEmojis?: boolean; // New: enables emoji reading and max repeated emojis
 }
 
 export function useTTSSettings() {
@@ -21,6 +22,7 @@ export function useTTSSettings() {
   const [skipLargeNumbers, setSkipLargeNumbersState] = useState(false);
   const [muteWhenActiveSource, setMuteWhenActiveSourceState] = useState(false);
   const [disableNeuralVoices, setDisableNeuralVoicesState] = useState(false);
+  const [enableEmojis, setEnableEmojisState] = useState(true);
 
   // Save settings to backend
   const saveSettings = (settings: TTSSettings) => {
@@ -39,8 +41,9 @@ export function useTTSSettings() {
       skipLargeNumbers,
       muteWhenActiveSource,
       disableNeuralVoices,
+      enableEmojis,
     });
-  }, [ttsEnabled, readNameBeforeMessage, includePlatformWithName, maxRepeatedChars, maxRepeatedEmojis, skipLargeNumbers, muteWhenActiveSource, disableNeuralVoices, ttsSettingsLoaded]);
+  }, [ttsEnabled, readNameBeforeMessage, includePlatformWithName, maxRepeatedChars, maxRepeatedEmojis, skipLargeNumbers, muteWhenActiveSource, disableNeuralVoices, enableEmojis, ttsSettingsLoaded]);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,6 +57,7 @@ export function useTTSSettings() {
       setSkipLargeNumbersState(!!settings.skipLargeNumbers);
       setMuteWhenActiveSourceState(!!settings.muteWhenActiveSource);
       setDisableNeuralVoicesState(!!settings.disableNeuralVoices);
+      setEnableEmojisState(settings.enableEmojis !== false); // default true
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -77,5 +81,7 @@ export function useTTSSettings() {
     setMuteWhenActiveSource: setMuteWhenActiveSourceState,
     disableNeuralVoices,
     setDisableNeuralVoices: setDisableNeuralVoicesState,
+    enableEmojis,
+    setEnableEmojis: setEnableEmojisState,
   };
 }

@@ -34,6 +34,8 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     setMuteWhenActiveSource,
     disableNeuralVoices,
     setDisableNeuralVoices,
+    enableEmojis,
+    setEnableEmojis,
   } = useTTSSettings();
 
   // Handlers
@@ -140,18 +142,34 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
         </span>
       </div>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated emojis</div>
-        <input
-          type="number"
-          min={1}
-          max={10}
-          value={maxRepeatedEmojis}
-          onChange={e => setMaxRepeatedEmojis(Number(e.target.value))}
-          style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
-        />
-        <span style={{ color: '#aaa' }}>
-          Example: <b>😂😂😂😂😂</b> → <b>😂😂😂</b> (if limit is 3)
-        </span>
+        <label>
+          <input
+            type="checkbox"
+            checked={enableEmojis}
+            onChange={e => setEnableEmojis(e.target.checked)}
+            disabled={!ttsSettingsLoaded}
+          />{' '}
+          Enable emojis in TTS
+        </label>
+        <div style={{ color: '#aaa', marginTop: 4 }}>
+          When enabled, emojis will be read out in TTS. When disabled, all emojis will be skipped.
+        </div>
+        {enableEmojis && (
+          <div style={{ marginTop: 8, marginLeft: 24 }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Max repeated emojis</div>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={maxRepeatedEmojis}
+              onChange={e => setMaxRepeatedEmojis(Number(e.target.value))}
+              style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #333', marginRight: 8 }}
+            />
+            <span style={{ color: '#aaa' }}>
+              Example: <b>😂😂😂😂😂</b> → <b>😂😂😂</b> (if limit is 3)
+            </span>
+          </div>
+        )}
       </div>
       <div style={{ marginBottom: 16 }}>
         <label>

@@ -7,6 +7,7 @@ import { app } from 'electron';
 // Load Polly voices/engines asset for backend-side engine lookup
 import voicesJson from '../../shared/assets/pollyVoiceEngines.sorted.json';
 
+
 export interface PollyConfig {
   accessKeyId: string;
   secretAccessKey: string;
@@ -75,6 +76,7 @@ function getFirstEngineForVoice(voiceId?: string): string {
   return found && found.Engines && found.Engines.length > 0 ? found.Engines[0] : 'standard';
 }
 
+
 export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string): Promise<string> {
   if (!polly || !pollyConfig) {
     throw new Error('Polly is not configured');
@@ -91,16 +93,58 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
     }
   }
 
-  // Load TTS settings to check for neural voice restriction
+  // Load TTS settings to check for neural voice restriction and emoji filtering
   let disableNeuralVoices = false;
+  let enableEmojis = true;
+  let maxRepeatedEmojis = 3;
   try {
     const userDataPath = app.getPath('userData');
     const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
     if (fs.existsSync(ttsSettingsPath)) {
       const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
       disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+      enableEmojis = ttsSettings.enableEmojis !== false; // default true
+      if (typeof ttsSettings.maxRepeatedEmojis === 'number') {
+        maxRepeatedEmojis = ttsSettings.maxRepeatedEmojis;
+      }
     }
   } catch {}
+
+  // Emoji filtering logic
+  let filteredText = text;
+  if (!enableEmojis) {
+    // Remove all emoji characters
+    // Unicode emoji regex (covers most emoji)
+    filteredText = filteredText.replace(/[\p{Emoji_Presentation}\p{Emoji}\u200d]+/gu, '');
+  } else if (maxRepeatedEmojis > 0) {
+    // Limit repeated emojis
+    // This regex finds repeated emoji runs and limits them
+    // We use a dynamic RegExp to allow variable repeat count
+    const emojiRegex = /([\p{Emoji_Presentation}\p{Emoji}\u200d])/gu;
+    let lastChar = '';
+    let count = 0;
+    let result = '';
+    for (const char of filteredText) {
+      if (emojiRegex.test(char)) {
+        if (char === lastChar) {
+          count++;
+        } else {
+          count = 1;
+          lastChar = char;
+        }
+        if (count <= maxRepeatedEmojis) {
+          result += char;
+        }
+      } else {
+        result += char;
+        lastChar = '';
+        count = 0;
+      }
+      // Reset regex state for next char
+      emojiRegex.lastIndex = 0;
+    }
+    filteredText = result;
+  }
 
   // Find the requested voice in the voices list
   const allVoices = voicesJson as any[];
@@ -132,7 +176,7 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       // Synthesize as PCM and wrap as WAV
       const params: Polly.SynthesizeSpeechInput = {
         OutputFormat: 'pcm',
-        Text: text,
+        Text: filteredText,
         VoiceId: resolvedVoiceId,
         TextType: 'text',
         Engine: resolvedEngine as any,
@@ -149,7 +193,7 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       // Synthesize as MP3 for browser/OBS compatibility
       const params: Polly.SynthesizeSpeechInput = {
         OutputFormat: 'mp3',
-        Text: text,
+        Text: filteredText,
         VoiceId: resolvedVoiceId,
         TextType: 'text',
         Engine: resolvedEngine as any,
