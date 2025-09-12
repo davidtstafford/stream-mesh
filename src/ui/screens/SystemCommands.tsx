@@ -12,6 +12,8 @@ interface SystemCommand {
 
 const SystemCommands: React.FC = () => {
   const [commands, setCommands] = useState<SystemCommand[]>([]);
+  const [sortOption, setSortOption] = useState<'permission' | 'alphabetical'>('permission');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,25 @@ const SystemCommands: React.FC = () => {
       setError('Failed to load system commands. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sorting logic
+  const getSortedCommands = () => {
+    let filtered = commands.filter(cmd =>
+      cmd.command.toLowerCase().includes(search.toLowerCase())
+    );
+    if (sortOption === 'alphabetical') {
+      return filtered.slice().sort((a, b) => a.command.localeCompare(b.command));
+    } else {
+      // permission: viewer, moderator, super_moderator, then rest alphabetically
+      const permOrder = { viewer: 0, moderator: 1, super_moderator: 2 };
+      return filtered.slice().sort((a, b) => {
+        const aPerm = permOrder[a.permissionLevel] ?? 99;
+        const bPerm = permOrder[b.permissionLevel] ?? 99;
+        if (aPerm !== bPerm) return aPerm - bPerm;
+        return a.command.localeCompare(b.command);
+      });
     }
   };
 
@@ -121,6 +142,7 @@ const SystemCommands: React.FC = () => {
     );
   }
 
+
   return (
     <div style={{ ...getResponsiveContainerStyle(700), color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -142,7 +164,47 @@ const SystemCommands: React.FC = () => {
           {loading ? '🔄' : '🔄 Refresh'}
         </button>
       </div>
-      
+
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <input
+            type="text"
+            placeholder="Search commands..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #444',
+              background: '#23272b',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ color: '#aaa', marginRight: 8 }}>Sort by:</label>
+          <select
+            value={sortOption}
+            onChange={e => setSortOption(e.target.value as 'permission' | 'alphabetical')}
+            style={{
+              background: '#23272b',
+              color: '#fff',
+              border: '1px solid #444',
+              borderRadius: 6,
+              padding: '8px 12px',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          >
+            <option value="permission">Permission Level</option>
+            <option value="alphabetical">Alphabetical</option>
+          </select>
+        </div>
+      </div>
+
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Built-in commands provided by Stream Mesh. Toggle to enable/disable each command.
       </div>
@@ -175,7 +237,7 @@ const SystemCommands: React.FC = () => {
         </div>
       )}
       
-      {commands.length === 0 ? (
+      {getSortedCommands().length === 0 ? (
         <div style={{ 
           background: '#2a2a2a', 
           border: '1px solid #444',
@@ -247,7 +309,7 @@ const SystemCommands: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {commands.map((command, index) => (
+            {getSortedCommands().map((command, index) => (
               <tr key={command.command} style={{ 
                 borderBottom: index < commands.length - 1 ? '1px solid #333' : 'none'
               }}>
