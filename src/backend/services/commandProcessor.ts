@@ -35,6 +35,99 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
+    // ~enablevoice command (moderator)
+    const enableVoiceCommand: SystemCommand = {
+      command: '~enablevoice',
+      enabled: true,
+      description: 'Enable or disable TTS for a user: ~enablevoice @username on|off',
+      permissionLevel: 'moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~enablevoice part
+          if (args.length < 2) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~enablevoice @username on|off`,
+              '~enablevoice',
+              event.platform
+            );
+            return;
+          }
+          const mention = args[0];
+          const state = args[1].toLowerCase();
+          if (!mention.startsWith('@') || !['on','off'].includes(state)) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~enablevoice @username on|off`,
+              '~enablevoice',
+              event.platform
+            );
+            return;
+          }
+          const targetUsername = mention.replace(/^@/, '');
+
+          // Find the Twitch user ID for the tagged user from tags or DB
+          let targetUserId = null;
+          if (event.tags && event.tags['mentions']) {
+            const mentions = event.tags['mentions'].split(',');
+            if (mentions.length === 1) {
+              targetUserId = mentions[0];
+            } else if (event.tags['msg-param-recipient-id']) {
+              targetUserId = event.tags['msg-param-recipient-id'];
+            }
+          }
+          if (!targetUserId) {
+            const { db } = require('../core/database');
+            const row = await new Promise<any>((resolve) => {
+              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+                resolve(row);
+              });
+            });
+            if (row && row.platform_key) {
+              targetUserId = row.platform_key;
+            }
+          }
+          if (!targetUserId) {
+            await this.sendCommandResponse(
+              `@${event.user} Could not find user @${targetUsername}.`,
+              '~enablevoice',
+              event.platform
+            );
+            return;
+          }
+
+          // Compute viewerKey for DB
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${targetUserId}`).digest('hex').slice(0, 12);
+          // Save tts_disabled setting to database
+          const { upsertViewerSetting } = require('../core/database');
+          const ttsDisabled = state === 'off' ? 'true' : 'false';
+          await new Promise<void>((resolve, reject) => {
+            upsertViewerSetting(
+              { viewer_id: viewerKey, key: 'tts_disabled', value: ttsDisabled },
+              (err: Error | null) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          await this.sendCommandResponse(
+            `@${event.user} TTS for @${targetUsername} has been ${state === 'on' ? 'enabled' : 'disabled'}.`,
+            '~enablevoice',
+            event.platform
+          );
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~enablevoice command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to update TTS state.`,
+            '~enablevoice',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~enablevoice', enableVoiceCommand);
     // ~viewervoice command
     const viewerVoiceCommand: SystemCommand = {
       command: '~viewervoice',
