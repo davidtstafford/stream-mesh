@@ -35,6 +35,103 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
+    // ~setperm command (supermod only)
+    const setPermCommand: SystemCommand = {
+      command: '~setperm',
+      enabled: true,
+      description: 'Set a user\'s permission level: ~setperm @username viewer|mod|smod (supermod only)',
+      permissionLevel: 'super_moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~setperm part
+          if (args.length < 2) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~setperm @username viewer|mod|smod`,
+              '~setperm',
+              event.platform
+            );
+            return;
+          }
+          const mention = args[0];
+          const levelArg = args[1].toLowerCase();
+          if (!mention.startsWith('@') || !['viewer','mod','smod'].includes(levelArg)) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~setperm @username viewer|mod|smod`,
+              '~setperm',
+              event.platform
+            );
+            return;
+          }
+          const targetUsername = mention.replace(/^@/, '');
+          // Map levelArg to permissionLevel
+          let newLevel: 'viewer' | 'moderator' | 'super_moderator';
+          if (levelArg === 'viewer') newLevel = 'viewer';
+          else if (levelArg === 'mod') newLevel = 'moderator';
+          else newLevel = 'super_moderator';
+
+          // Find the user ID for the tagged user from tags or DB
+          let targetUserId = null;
+          if (event.tags && event.tags['mentions']) {
+            const mentions = event.tags['mentions'].split(',');
+            if (mentions.length === 1) {
+              targetUserId = mentions[0];
+            } else if (event.tags['msg-param-recipient-id']) {
+              targetUserId = event.tags['msg-param-recipient-id'];
+            }
+          }
+          if (!targetUserId) {
+            const { db } = require('../core/database');
+            const row = await new Promise<any>((resolve) => {
+              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+                resolve(row);
+              });
+            });
+            if (row && row.platform_key) {
+              targetUserId = row.platform_key;
+            }
+          }
+          if (!targetUserId) {
+            await this.sendCommandResponse(
+              `@${event.user} Could not find user @${targetUsername}.`,
+              '~setperm',
+              event.platform
+            );
+            return;
+          }
+
+          // Compute viewerKey for DB
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${targetUserId}`).digest('hex').slice(0, 12);
+          // Save role setting to database
+          const { upsertViewerSetting } = require('../core/database');
+          await new Promise<void>((resolve, reject) => {
+            upsertViewerSetting(
+              { viewer_id: viewerKey, key: 'role', value: newLevel },
+              (err: Error | null) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          await this.sendCommandResponse(
+            `@${event.user} Set @${targetUsername}'s permission level to ${newLevel.replace('_', ' ')}.`,
+            '~setperm',
+            event.platform
+          );
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~setperm command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to set permission level.`,
+            '~setperm',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~setperm', setPermCommand);
     // ~enabletts command (supermod)
     const enableTTSCommand: SystemCommand = {
       command: '~enabletts',
