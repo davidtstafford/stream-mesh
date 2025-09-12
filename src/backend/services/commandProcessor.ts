@@ -35,6 +35,127 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
+    // ~setviewervoice command (supermod only)
+    const setViewerVoiceCommand: SystemCommand = {
+      command: '~setviewervoice',
+      enabled: true,
+      description: 'Set another user\'s TTS voice (supermod only): ~setviewervoice @username VoiceName',
+      permissionLevel: 'super_moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~setviewervoice part
+          if (args.length < 2) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~setviewervoice @username VoiceName`,
+              '~setviewervoice',
+              event.platform
+            );
+            return;
+          }
+          // Parse @username and voice
+          const mention = args[0];
+          const voiceName = args.slice(1).join(' ');
+          if (!mention.startsWith('@') || !voiceName) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~setviewervoice @username VoiceName`,
+              '~setviewervoice',
+              event.platform
+            );
+            return;
+          }
+          const targetUsername = mention.replace(/^@/, '');
+
+          // Find the Twitch user ID for the tagged user from tags (Twitch: tags["mentions"] or tags["user-id"])
+          // Try to find the user in the tags. If not, fallback to DB lookup by username.
+          let targetUserId = null;
+          if (event.tags && event.tags['mentions']) {
+            // tmi.js may provide a comma-separated list of user IDs in 'mentions'
+            // Try to match the username to the correct user ID
+            const mentions = event.tags['mentions'].split(',');
+            if (mentions.length === 1) {
+              targetUserId = mentions[0];
+            } else if (event.tags['msg-param-recipient-id']) {
+              targetUserId = event.tags['msg-param-recipient-id'];
+            }
+          }
+          // Fallback: try to find the user in the DB by username and platform
+          if (!targetUserId) {
+            const { db } = require('../core/database');
+            const row = await new Promise<any>((resolve) => {
+              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+                resolve(row);
+              });
+            });
+            if (row && row.platform_key) {
+              targetUserId = row.platform_key;
+            }
+          }
+          if (!targetUserId) {
+            await this.sendCommandResponse(
+              `@${event.user} Could not find user @${targetUsername}.`,
+              '~setviewervoice',
+              event.platform
+            );
+            return;
+          }
+
+          // Validate the requested voice
+          let disableNeuralVoices = false;
+          try {
+            const userDataPath = app.getPath('userData');
+            const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+            if (fs.existsSync(ttsSettingsPath)) {
+              const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+              disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+            }
+          } catch {}
+          let allVoices = pollyVoiceEngines as any[];
+          if (disableNeuralVoices) {
+            allVoices = allVoices.filter(v => v.Engines.includes('standard'));
+          }
+          const foundVoice = allVoices.find(v => v.Name.toLowerCase() === voiceName.toLowerCase());
+          if (!foundVoice) {
+            await this.sendCommandResponse(
+              `@${event.user} Voice "${voiceName}" not found. Use ~voices to see available voices.`,
+              '~setviewervoice',
+              event.platform
+            );
+            return;
+          }
+
+          // Compute viewerKey for DB
+          const platform = event.platform;
+          const crypto = require('crypto');
+          const viewerKey = crypto.createHash('sha256').update(`${platform}:${targetUserId}`).digest('hex').slice(0, 12);
+          // Save voice setting to database
+          const { upsertViewerSetting } = require('../core/database');
+          await new Promise<void>((resolve, reject) => {
+            upsertViewerSetting(
+              { viewer_id: viewerKey, key: 'voice', value: foundVoice.Name },
+              (err: Error | null) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          await this.sendCommandResponse(
+            `@${event.user} Set @${targetUsername}'s TTS voice to ${foundVoice.Name} (${foundVoice.LanguageName}).`,
+            '~setviewervoice',
+            event.platform
+          );
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~setviewervoice command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to set viewer voice.`,
+            '~setviewervoice',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~setviewervoice', setViewerVoiceCommand);
     // ~hello command
     const helloCommand: SystemCommand = {
       command: '~hello',
