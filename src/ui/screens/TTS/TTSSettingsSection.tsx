@@ -167,16 +167,7 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
           (Ignores numbers longer than 6 digits)
         </span>
       </div>
-      <div style={{ marginTop: 24 }}>
-        <button
-          style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}
-          onClick={() => handleSave()}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save TTS Settings'}
-        </button>
-        {status && <div style={{ color: status === 'TTS settings saved!' ? '#2ecc40' : '#ff4d4f', marginTop: 8 }}>{status}</div>}
-      </div>
+  {/* Settings are now saved automatically on change. */}
     </div>
   );
 };
