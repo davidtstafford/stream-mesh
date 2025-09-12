@@ -35,6 +35,58 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
+    // ~enabletts command (supermod)
+    const enableTTSCommand: SystemCommand = {
+      command: '~enabletts',
+      enabled: true,
+      description: 'Enable or disable global TTS: ~enabletts on|off',
+      permissionLevel: 'super_moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1); // Remove ~enabletts part
+          if (args.length < 1 || !['on','off'].includes(args[0].toLowerCase())) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~enabletts on|off`,
+              '~enabletts',
+              event.platform
+            );
+            return;
+          }
+          const state = args[0].toLowerCase();
+          // Update ttsSettings.json
+          const userDataPath = app.getPath('userData');
+          const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+          let ttsSettings: Record<string, any> = { enabled: true };
+          if (fs.existsSync(ttsSettingsPath)) {
+            try {
+              ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+              if (typeof ttsSettings !== 'object' || ttsSettings === null) {
+                ttsSettings = { enabled: true };
+              }
+            } catch {
+              ttsSettings = { enabled: true };
+            }
+          }
+          ttsSettings.enabled = state === 'on';
+          fs.writeFileSync(ttsSettingsPath, JSON.stringify(ttsSettings, null, 2), 'utf-8');
+          await this.sendCommandResponse(
+            `@${event.user} Global TTS has been ${state === 'on' ? 'enabled' : 'disabled'}.`,
+            '~enabletts',
+            event.platform
+          );
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~enabletts command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to update global TTS state.`,
+            '~enabletts',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~enabletts', enableTTSCommand);
     // ~enablevoice command (moderator)
     const enableVoiceCommand: SystemCommand = {
       command: '~enablevoice',
