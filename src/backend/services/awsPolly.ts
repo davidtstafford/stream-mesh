@@ -77,7 +77,7 @@ function getFirstEngineForVoice(voiceId?: string): string {
 }
 
 
-export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string): Promise<string> {
+export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string, emotes?: any): Promise<string> {
   if (!polly || !pollyConfig) {
     throw new Error('Polly is not configured');
   }
@@ -109,6 +109,25 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       }
     }
   } catch {}
+    // Load TTS settings to check for neural voice restriction, emoji, and emote filtering
+    let enableEmotes = true;
+    let maxRepeatedEmotes = 3;
+    try {
+      const userDataPath = app.getPath('userData');
+      const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+      if (fs.existsSync(ttsSettingsPath)) {
+        const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+        disableNeuralVoices = !!ttsSettings.disableNeuralVoices;
+        enableEmojis = ttsSettings.enableEmojis !== false; // default true
+        if (typeof ttsSettings.maxRepeatedEmojis === 'number') {
+          maxRepeatedEmojis = ttsSettings.maxRepeatedEmojis;
+        }
+        enableEmotes = ttsSettings.enableEmotes !== false; // default true
+        if (typeof ttsSettings.maxRepeatedEmotes === 'number') {
+          maxRepeatedEmotes = ttsSettings.maxRepeatedEmotes;
+        }
+      }
+    } catch {}
 
   // Emoji filtering logic
   let filteredText = text;
@@ -144,6 +163,61 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       emojiRegex.lastIndex = 0;
     }
     filteredText = result;
+  }
+
+  // --- Emote filtering using Twitch metadata ---
+  if (emotes && typeof emotes === 'object') {
+    // emotes: { emoteId: ["start-end", ...], ... }
+    // Build a list of all emote occurrences with their positions and IDs
+    let emoteInstances: { id: string, start: number, end: number, text: string }[] = [];
+    for (const [emoteId, positions] of Object.entries(emotes)) {
+      for (const pos of positions as string[]) {
+        const [start, end] = pos.split('-').map(Number);
+        emoteInstances.push({
+          id: emoteId,
+          start,
+          end,
+          text: text.slice(start, end + 1),
+        });
+      }
+    }
+    // Sort by start position
+    emoteInstances.sort((a, b) => a.start - b.start);
+
+    if (!enableEmotes) {
+      // Remove all emotes by replacing their ranges with ''
+      let result = '';
+      let lastIdx = 0;
+      for (const emote of emoteInstances) {
+        result += filteredText.slice(lastIdx, emote.start);
+        lastIdx = emote.end + 1;
+      }
+      result += filteredText.slice(lastIdx);
+      filteredText = result;
+    } else if (maxRepeatedEmotes > 0) {
+      // Limit repeated emotes (consecutive identical emote IDs)
+      let result = '';
+      let lastIdx = 0;
+      let lastEmoteId = '';
+      let count = 0;
+      for (let i = 0; i < emoteInstances.length; i++) {
+        const emote = emoteInstances[i];
+        // Append text before this emote
+        result += filteredText.slice(lastIdx, emote.start);
+        if (emote.id === lastEmoteId) {
+          count++;
+        } else {
+          count = 1;
+          lastEmoteId = emote.id;
+        }
+        if (count <= maxRepeatedEmotes) {
+          result += emote.text;
+        }
+        lastIdx = emote.end + 1;
+      }
+      result += filteredText.slice(lastIdx);
+      filteredText = result;
+    }
   }
 
   // Find the requested voice in the voices list

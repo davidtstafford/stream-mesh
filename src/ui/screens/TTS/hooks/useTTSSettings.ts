@@ -10,6 +10,8 @@ export interface TTSSettings {
   muteWhenActiveSource?: boolean;
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
   enableEmojis?: boolean; // New: enables emoji reading and max repeated emojis
+  enableEmotes?: boolean;
+  maxRepeatedEmotes?: number;
 }
 
 export function useTTSSettings() {
@@ -23,6 +25,8 @@ export function useTTSSettings() {
   const [muteWhenActiveSource, setMuteWhenActiveSourceState] = useState(false);
   const [disableNeuralVoices, setDisableNeuralVoicesState] = useState(false);
   const [enableEmojis, setEnableEmojisState] = useState(true);
+  const [enableEmotes, setEnableEmotesState] = useState(true);
+  const [maxRepeatedEmotes, setMaxRepeatedEmotesState] = useState(3);
 
   // Save settings to backend
   const saveSettings = (settings: TTSSettings) => {
@@ -42,8 +46,10 @@ export function useTTSSettings() {
       muteWhenActiveSource,
       disableNeuralVoices,
       enableEmojis,
+      enableEmotes,
+      maxRepeatedEmotes,
     });
-  }, [ttsEnabled, readNameBeforeMessage, includePlatformWithName, maxRepeatedChars, maxRepeatedEmojis, skipLargeNumbers, muteWhenActiveSource, disableNeuralVoices, enableEmojis, ttsSettingsLoaded]);
+  }, [ttsEnabled, readNameBeforeMessage, includePlatformWithName, maxRepeatedChars, maxRepeatedEmojis, skipLargeNumbers, muteWhenActiveSource, disableNeuralVoices, enableEmojis, enableEmotes, maxRepeatedEmotes, ttsSettingsLoaded]);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +64,8 @@ export function useTTSSettings() {
       setMuteWhenActiveSourceState(!!settings.muteWhenActiveSource);
       setDisableNeuralVoicesState(!!settings.disableNeuralVoices);
       setEnableEmojisState(settings.enableEmojis !== false); // default true
+      setEnableEmotesState(settings.enableEmotes !== false); // default true
+      setMaxRepeatedEmotesState(typeof settings.maxRepeatedEmotes === 'number' ? settings.maxRepeatedEmotes : 3);
       setTtsSettingsLoaded(true);
     });
     return () => { isMounted = false; };
@@ -83,5 +91,9 @@ export function useTTSSettings() {
     setDisableNeuralVoices: setDisableNeuralVoicesState,
     enableEmojis,
     setEnableEmojis: setEnableEmojisState,
+    enableEmotes,
+    setEnableEmotes: setEnableEmotesState,
+    maxRepeatedEmotes,
+    setMaxRepeatedEmotes: setMaxRepeatedEmotesState,
   };
 }
