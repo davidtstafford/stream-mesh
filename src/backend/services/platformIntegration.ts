@@ -51,7 +51,15 @@ class PlatformIntegrationService extends EventEmitter {
       throw new Error('Username and access token are required.');
     }
     if (this.twitchClient) {
-      await this.twitchClient.disconnect();
+      // Only disconnect if actually connected
+      if (typeof this.twitchClient._isConnected === 'function' ? this.twitchClient._isConnected() : (this.twitchClient.ws && this.twitchClient.ws.readyState === 1)) {
+        try {
+          await this.twitchClient.disconnect();
+        } catch (err) {
+          // Ignore disconnect errors
+          console.warn('[Twitch] Disconnect error (ignored):', err);
+        }
+      }
     }
     this.twitchAuth = auth;
     this.twitchClient = new tmi.client({
@@ -195,7 +203,15 @@ class PlatformIntegrationService extends EventEmitter {
 
   async disconnectTwitch() {
     if (this.twitchClient) {
-      await this.twitchClient.disconnect();
+      // Only disconnect if actually connected
+      if (typeof this.twitchClient._isConnected === 'function' ? this.twitchClient._isConnected() : (this.twitchClient.ws && this.twitchClient.ws.readyState === 1)) {
+        try {
+          await this.twitchClient.disconnect();
+        } catch (err) {
+          // Ignore disconnect errors
+          console.warn('[Twitch] Disconnect error (ignored):', err);
+        }
+      }
       this.twitchClient = null;
     }
     this.twitchAuth = null;
