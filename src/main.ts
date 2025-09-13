@@ -164,7 +164,10 @@ interface TTSSettings {
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
-  // Future: per-user overrides, blocklist, message prefix, etc.
+  blocklist?: string[]; // List of phrases that block TTS if present
+  enableEmojis?: boolean; // Enable emoji reading
+  enableEmotes?: boolean; // Enable emote reading
+  maxRepeatedEmotes?: number; // Max repeated emotes
 }
 
 function loadTTSSettings(): TTSSettings {
@@ -181,10 +184,25 @@ function loadTTSSettings(): TTSSettings {
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
       disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
+      blocklist: Array.isArray(parsed.blocklist) ? parsed.blocklist : [],
+      enableEmojis: typeof parsed.enableEmojis === 'boolean' ? parsed.enableEmojis : true,
+      enableEmotes: typeof parsed.enableEmotes === 'boolean' ? parsed.enableEmotes : true,
+      maxRepeatedEmotes: typeof parsed.maxRepeatedEmotes === 'number' ? parsed.maxRepeatedEmotes : 3,
     };
   } catch {
-    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, maxRepeatedEmojis: 3, skipLargeNumbers: false, disableNeuralVoices: false };
+    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3, emotes/emojis enabled, maxRepeatedEmotes = 3
+    return {
+      enabled: false,
+      readNameBeforeMessage: false,
+      includePlatformWithName: false,
+      maxRepeatedChars: 3,
+      maxRepeatedEmojis: 3,
+      skipLargeNumbers: false,
+      disableNeuralVoices: false,
+      enableEmojis: true,
+      enableEmotes: true,
+      maxRepeatedEmotes: 3
+    };
   }
 }
 
@@ -733,11 +751,24 @@ app.whenReady().then(async () => {
   });
 
   // TTS settings IPC handlers
+  ipcMain.handle('tts:getBlocklist', async () => {
+    const settings = loadTTSSettings();
+    return Array.isArray(settings.blocklist) ? settings.blocklist : [];
+  });
+  ipcMain.handle('tts:setBlocklist', async (_event, blocklist: string[]) => {
+    const settings = loadTTSSettings();
+    settings.blocklist = Array.isArray(blocklist) ? blocklist : [];
+    saveTTSSettings(settings);
+    return true;
+  });
   ipcMain.handle('tts:getSettings', async () => {
     return loadTTSSettings();
   });
   ipcMain.handle('tts:setSettings', async (_event, settings: TTSSettings) => {
-    saveTTSSettings(settings);
+    // Always preserve the current blocklist unless explicitly set
+    const current = loadTTSSettings();
+    const merged = { ...settings, blocklist: Array.isArray(settings.blocklist) ? settings.blocklist : (current.blocklist || []) };
+    saveTTSSettings(merged);
     return true;
   });
 

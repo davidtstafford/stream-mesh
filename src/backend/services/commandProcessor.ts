@@ -1,3 +1,4 @@
+// ...existing code...
 // Command processing service for handling chat commands
 import { EventEmitter } from 'events';
 import { platformIntegrationService, Platform } from './platformIntegration';
@@ -84,7 +85,7 @@ class CommandProcessor extends EventEmitter {
           if (!targetUserId) {
             const { db } = require('../core/database');
             const row = await new Promise<any>((resolve) => {
-              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+              db.get('SELECT platform_key FROM viewers WHERE LOWER(name) = LOWER(?) AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
                 resolve(row);
               });
             });
@@ -132,6 +133,44 @@ class CommandProcessor extends EventEmitter {
       }
     };
     this.systemCommands.set('~setperm', setPermCommand);
+    // ~blocksearch <term> command
+    const blocksearchCommand: SystemCommand = {
+      command: '~blocksearch',
+      enabled: true,
+      description: 'Search for blocklist entries containing a term: ~blocksearch <term> (moderator only)',
+      permissionLevel: 'moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const { app } = require('electron');
+          const userDataPath = app.getPath('userData');
+          const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+          let blocklist: string[] = [];
+          if (fs.existsSync(ttsSettingsPath)) {
+            const loaded = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+            blocklist = Array.isArray(loaded.blocklist) ? loaded.blocklist : [];
+          }
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1);
+          if (args.length < 1) {
+            await this.sendCommandResponse(`@${event.user} Usage: ~blocksearch <term>`, '~blocksearch', event.platform);
+            return;
+          }
+          const term = args.join(' ').toLowerCase();
+          const matches = blocklist.filter((item) => item.toLowerCase().includes(term));
+          const msg = matches.length > 0
+            ? `Blocklist matches: ${matches.join(', ')}`
+            : `No blocklist entries found containing '${term}'.`;
+          await this.sendCommandResponse(`@${event.user} ${msg}`, '~blocksearch', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~blocksearch command:', error);
+          await this.sendCommandResponse(`@${event.user} Sorry, failed to search blocklist.`, '~blocksearch', event.platform);
+        }
+      }
+    };
+    this.systemCommands.set('~blocksearch', blocksearchCommand);
     // ~enabletts command (supermod)
     const enableTTSCommand: SystemCommand = {
       command: '~enabletts',
@@ -228,7 +267,7 @@ class CommandProcessor extends EventEmitter {
           if (!targetUserId) {
             const { db } = require('../core/database');
             const row = await new Promise<any>((resolve) => {
-              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+              db.get('SELECT platform_key FROM viewers WHERE LOWER(name) = LOWER(?) AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
                 resolve(row);
               });
             });
@@ -562,6 +601,145 @@ class CommandProcessor extends EventEmitter {
     };
 
     this.systemCommands.set('~voices', voicesCommand);
+    // ~commands command (same pattern as ~voices)
+    const commandsCommand: SystemCommand = {
+      command: '~commands',
+      enabled: true,
+      description: 'Shows link to the Stream Mesh commands list',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const response = `@${event.user} View all Stream Mesh chat commands here: https://stream-mesh-website.web.app/commands.html`;
+          await this.sendCommandResponse(response, '~commands', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~commands command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to retrieve commands information.`,
+            '~commands',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~commands', commandsCommand);
+
+    // ~blocklist command (view blocklist)
+    const blocklistCommand: SystemCommand = {
+      command: '~blocklist',
+      enabled: true,
+      description: 'Show the current TTS blocklist (moderator only)',
+      permissionLevel: 'moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const { app } = require('electron');
+          const userDataPath = app.getPath('userData');
+          const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+          let blocklist = [];
+          if (fs.existsSync(ttsSettingsPath)) {
+            const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+            blocklist = Array.isArray(ttsSettings.blocklist) ? ttsSettings.blocklist : [];
+          }
+          const msg = blocklist.length > 0 ? `Blocked words: ${blocklist.join(', ')}` : 'Blocklist is empty.';
+          await this.sendCommandResponse(`@${event.user} ${msg}`, '~blocklist', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~blocklist command:', error);
+          await this.sendCommandResponse(`@${event.user} Sorry, failed to load blocklist.`, '~blocklist', event.platform);
+        }
+      }
+    };
+    this.systemCommands.set('~blocklist', blocklistCommand);
+
+    // ~blockadd <word> command
+    const blockaddCommand: SystemCommand = {
+      command: '~blockadd',
+      enabled: true,
+      description: 'Add a word to the TTS blocklist: ~blockadd <word> (moderator only)',
+      permissionLevel: 'moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const { app } = require('electron');
+          const userDataPath = app.getPath('userData');
+          const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+          let ttsSettings: { blocklist: string[] } = { blocklist: [] };
+          let blocklist: string[] = [];
+          if (fs.existsSync(ttsSettingsPath)) {
+            const loaded = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+            ttsSettings = { ...loaded, blocklist: Array.isArray(loaded.blocklist) ? loaded.blocklist : [] };
+            blocklist = ttsSettings.blocklist;
+          }
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1);
+          if (args.length < 1) {
+            await this.sendCommandResponse(`@${event.user} Usage: ~blockadd <word or phrase>`, '~blockadd', event.platform);
+            return;
+          }
+          const phrase = args.join(' ').toLowerCase();
+          if (blocklist.includes(phrase)) {
+            await this.sendCommandResponse(`@${event.user} '${phrase}' is already in the blocklist.`, '~blockadd', event.platform);
+            return;
+          }
+          blocklist.push(phrase);
+          ttsSettings.blocklist = blocklist;
+          fs.writeFileSync(ttsSettingsPath, JSON.stringify(ttsSettings, null, 2), 'utf-8');
+          await this.sendCommandResponse(`@${event.user} Added '${phrase}' to the blocklist.`, '~blockadd', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~blockadd command:', error);
+          await this.sendCommandResponse(`@${event.user} Sorry, failed to add to blocklist.`, '~blockadd', event.platform);
+        }
+      }
+    };
+    this.systemCommands.set('~blockadd', blockaddCommand);
+
+    // ~blockremove <word> command
+    const blockremoveCommand: SystemCommand = {
+      command: '~blockremove',
+      enabled: true,
+      description: 'Remove a word from the TTS blocklist: ~blockremove <word> (moderator only)',
+      permissionLevel: 'moderator',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const { app } = require('electron');
+          const userDataPath = app.getPath('userData');
+          const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+          let ttsSettings: { blocklist: string[] } = { blocklist: [] };
+          let blocklist: string[] = [];
+          if (fs.existsSync(ttsSettingsPath)) {
+            const loaded = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+            ttsSettings = { ...loaded, blocklist: Array.isArray(loaded.blocklist) ? loaded.blocklist : [] };
+            blocklist = ttsSettings.blocklist;
+          }
+          const message = event.message?.trim() || '';
+          const args = message.split(' ').slice(1);
+          if (args.length < 1) {
+            await this.sendCommandResponse(`@${event.user} Usage: ~blockremove <word or phrase>`, '~blockremove', event.platform);
+            return;
+          }
+          const phrase = args.join(' ').toLowerCase();
+          if (!blocklist.includes(phrase)) {
+            await this.sendCommandResponse(`@${event.user} '${phrase}' is not in the blocklist.`, '~blockremove', event.platform);
+            return;
+          }
+          blocklist = blocklist.filter((w: string) => w !== phrase);
+          ttsSettings.blocklist = blocklist;
+          fs.writeFileSync(ttsSettingsPath, JSON.stringify(ttsSettings, null, 2), 'utf-8');
+          await this.sendCommandResponse(`@${event.user} Removed '${phrase}' from the blocklist.`, '~blockremove', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~blockremove command:', error);
+          await this.sendCommandResponse(`@${event.user} Sorry, failed to remove from blocklist.`, '~blockremove', event.platform);
+        }
+      }
+    };
+    this.systemCommands.set('~blockremove', blockremoveCommand);
 
     // ~setvoice command
     const setvoiceCommand: SystemCommand = {

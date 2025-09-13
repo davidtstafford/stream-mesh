@@ -78,6 +78,22 @@ function getFirstEngineForVoice(voiceId?: string): string {
 
 
 export async function synthesizeSpeech(text: string, voiceId?: string, engine?: string, emotes?: any): Promise<string> {
+  // ...existing code...
+  // Blocklist check (load from ttsSettings.json) - MUST be first and must throw!
+  const userDataPath = app.getPath('userData');
+  const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
+  if (fs.existsSync(ttsSettingsPath)) {
+    const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
+    if (Array.isArray(ttsSettings.blocklist) && ttsSettings.blocklist.length > 0) {
+      const lowerText = text.toLowerCase();
+      for (const phrase of ttsSettings.blocklist) {
+        if (phrase && lowerText.includes(phrase.toLowerCase())) {
+          throw new Error('TTS blocked: message matches blocklist');
+        }
+      }
+    }
+  }
+  // ...existing code...
   if (!polly || !pollyConfig) {
     throw new Error('Polly is not configured');
   }

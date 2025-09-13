@@ -108,27 +108,48 @@ class TTSQueue extends EventEmitter {
     this.isPlaying = true;
     
     while (this.queue.length > 0 && !this.stopRequested) {
-      // Remove from the front of the queue (FIFO)
-      this.emit('queueChanged', this.queue.length - 1); // Emit before playback to update UI immediately
-      const item = this.queue.shift()!;
-      
+      const item = this.queue[0]; // Peek, don't dequeue yet
+      let filePath: string | undefined = undefined;
       try {
         const config = getPollyConfig();
         if (!config) {
           console.error('[TTSQueue] Polly not configured, skipping item');
+          this.queue.shift();
+          this.emit('queueChanged', this.queue.length);
           continue;
         }
-        
+
         console.log('[TTSQueue] Synthesizing:', item.text, 'Voice:', item.voiceId || config.voiceId);
-        
+
         // Add timeout for synthesis to prevent hanging on Catalina
-        const filePath = await Promise.race([
+        filePath = await Promise.race([
           synthesizeSpeech(item.text, item.voiceId || config.voiceId, undefined, item.emotes),
-          new Promise<never>((_, reject) => 
+          new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('TTS synthesis timeout')), 30000)
           )
         ]);
+      } catch (err) {
+        filePath = undefined; // Ensure filePath is not set on error
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage && errorMessage.startsWith('TTS blocked:')) {
+          console.log('[TTSQueue] Blocked by TTS blocklist:', item.text);
+          this.queue.shift();
+          this.emit('queueChanged', this.queue.length);
+          continue;
+        }
+        console.error('[TTSQueue] Error processing item:', err);
+        this.queue.shift();
+        this.emit('queueChanged', this.queue.length);
+        // If we get too many errors in a row, pause briefly to prevent spam
+        if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+          console.log('[TTSQueue] Pausing due to network/timeout errors...');
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second pause
+        }
+        continue;
+      }
 
+      // Only broadcast and play if synthesis succeeded (not blocked)
+      if (filePath) {
         // Broadcast to OBS TTS overlays (use a file URL that browser can access)
         const fileName = path.basename(filePath);
         const audioUrl = `/tts-audio/${fileName}`;
@@ -142,7 +163,7 @@ class TTSQueue extends EventEmitter {
             // Add timeout for audio playback as well
             await Promise.race([
               this.playAudio(filePath),
-              new Promise<never>((_, reject) => 
+              new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Audio playback timeout')), 15000)
               )
             ]);
@@ -153,29 +174,20 @@ class TTSQueue extends EventEmitter {
         } else {
           console.log('[TTSQueue] Native playback muted');
         }
-        
+
         // Delay deletion to allow overlays to load/play the file
         setTimeout(() => {
           try {
-            fs.unlink(filePath, (err) => {
+            fs.unlink(filePath!, (err) => {
               if (err) console.warn('[TTSQueue] Failed to delete temp file:', err);
             });
           } catch (unlinkErr) {
             console.warn('[TTSQueue] Error during file deletion:', unlinkErr);
           }
         }, 8000); // Increased to 8 seconds for Catalina
-        
-      } catch (err) {
-        console.error('[TTSQueue] Error processing item:', err);
-        this.emit('error', err);
-        
-        // If we get too many errors in a row, pause briefly to prevent spam
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
-          console.log('[TTSQueue] Pausing due to network/timeout errors...');
-          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second pause
-        }
       }
+      this.queue.shift();
+      this.emit('queueChanged', this.queue.length);
       // Optionally, emit again after playback if you want to distinguish between 'waiting' and 'spoken'
       // this.emit('queueChanged', this.queue.length);
     }

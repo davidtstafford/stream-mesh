@@ -28,9 +28,11 @@ export function useTTSSettings() {
   const [enableEmotes, setEnableEmotesState] = useState(true);
   const [maxRepeatedEmotes, setMaxRepeatedEmotesState] = useState(3);
 
-  // Save settings to backend
-  const saveSettings = (settings: TTSSettings) => {
-    window.electron.ipcRenderer.invoke('tts:setSettings', settings);
+  // Save settings to backend, preserving blocklist
+  const saveSettings = async (settings: TTSSettings) => {
+    // Always merge in the current blocklist
+    const current = await window.electron.ipcRenderer.invoke('tts:getBlocklist');
+    window.electron.ipcRenderer.invoke('tts:setSettings', { ...settings, blocklist: current });
   };
 
   // Save on every change
@@ -49,6 +51,7 @@ export function useTTSSettings() {
       enableEmotes,
       maxRepeatedEmotes,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsEnabled, readNameBeforeMessage, includePlatformWithName, maxRepeatedChars, maxRepeatedEmojis, skipLargeNumbers, muteWhenActiveSource, disableNeuralVoices, enableEmojis, enableEmotes, maxRepeatedEmotes, ttsSettingsLoaded]);
 
   useEffect(() => {

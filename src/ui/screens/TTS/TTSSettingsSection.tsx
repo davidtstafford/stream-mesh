@@ -1,5 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTTSSettings } from './hooks/useTTSSettings';
+// Modal for editing TTS blocklist
+const BlocklistModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  blocklist: string[];
+  setBlocklist: (list: string[]) => void;
+}> = ({ open, onClose, blocklist, setBlocklist }) => {
+  const [input, setInput] = useState('');
+  const [filter, setFilter] = useState('');
+  if (!open) return null;
+  const filteredBlocklist = filter.trim() ? blocklist.filter(word => word.toLowerCase().includes(filter.trim().toLowerCase())) : blocklist;
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000 }}>
+      <div style={{ maxWidth: 420, margin: '120px auto', background: '#181c20', padding: 24, borderRadius: 8, color: '#fff', boxShadow: '0 2px 16px #0008' }}>
+        <h3 style={{ marginBottom: 12 }}>TTS Blocklist</h3>
+        <div style={{ color: '#aaa', marginBottom: 12 }}>
+          Add words or phrases that will prevent TTS from reading a message if matched (case-insensitive, anywhere in message). Example: <b>!gamble</b> will block <i>!gamble 40000</i>.
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Add word or phrase"
+            style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #444', background: '#23272b', color: '#fff' }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && input.trim()) {
+                setBlocklist([...blocklist, input.trim()]);
+                setInput('');
+              }
+            }}
+          />
+          <button
+            onClick={() => { if (input.trim()) { setBlocklist([...blocklist, input.trim()]); setInput(''); }}}
+            style={{ padding: '8px 16px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none' }}
+          >Add</button>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <input
+            type="text"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Filter blocklist..."
+            style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #444', background: '#23272b', color: '#fff' }}
+          />
+        </div>
+        <ul style={{ maxHeight: 180, overflowY: 'auto', padding: 0, margin: 0, listStyle: 'none' }}>
+          {filteredBlocklist.map((word, i) => (
+            <li key={word + i} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ flex: 1, color: '#fff', fontSize: 15 }}>{word}</span>
+              <button
+                onClick={() => setBlocklist(blocklist.filter((_, idx) => idx !== blocklist.indexOf(word)))}
+                style={{ marginLeft: 8, background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 13 }}
+              >Remove</button>
+            </li>
+          ))}
+        </ul>
+        <div style={{ textAlign: 'right', marginTop: 16 }}>
+          <button onClick={onClose} style={{ background: '#3a3f4b', color: '#fff', padding: '8px 16px', border: 'none', borderRadius: 4 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface TTSSettingsSectionProps {
   saving: boolean;
@@ -34,13 +98,32 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
     setMuteWhenActiveSource,
     disableNeuralVoices,
     setDisableNeuralVoices,
-  enableEmojis,
-  setEnableEmojis,
-  enableEmotes,
-  setEnableEmotes,
-  maxRepeatedEmotes,
-  setMaxRepeatedEmotes,
+    enableEmojis,
+    setEnableEmojis,
+    enableEmotes,
+    setEnableEmotes,
+    maxRepeatedEmotes,
+    setMaxRepeatedEmotes,
   } = useTTSSettings();
+
+  // Blocklist state
+  const [blocklist, setBlocklistState] = useState<string[]>([]);
+  const [blocklistModalOpen, setBlocklistModalOpen] = useState(false);
+
+  // Load blocklist from backend on mount
+  React.useEffect(() => {
+    window.electron.ipcRenderer.invoke('tts:getBlocklist').then((list: string[]) => {
+      if (Array.isArray(list)) setBlocklistState(list);
+    });
+  }, []);
+  // Save blocklist to backend on change
+  React.useEffect(() => {
+    window.electron.ipcRenderer.invoke('tts:setBlocklist', blocklist);
+  }, [blocklist]);
+
+  const openBlocklistModal = () => setBlocklistModalOpen(true);
+  const closeBlocklistModal = () => setBlocklistModalOpen(false);
+  const setBlocklist = (list: string[]) => setBlocklistState(list.filter(w => !!w.trim()));
 
   // Handlers
   const handleToggleTts = () => setTtsEnabled(!ttsEnabled);
@@ -66,18 +149,26 @@ const TTSSettingsSection: React.FC<TTSSettingsSectionProps> = ({ saving, onSave 
 
   return (
     <div>
+      <BlocklistModal open={blocklistModalOpen} onClose={closeBlocklistModal} blocklist={blocklist} setBlocklist={setBlocklist} />
       <h2 style={{ fontWeight: 'bold', marginBottom: 8 }}>TTS Settings</h2>
       <div style={{ color: '#aaa', marginBottom: 16 }}>
         Configure TTS voices, filters, and moderation. (Initial version: only basic settings, more coming soon)
       </div>
 
-      <div style={{ marginBottom: 16 }}>
+  <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
         <label>
           <input type="checkbox" checked={ttsEnabled} onChange={handleToggleTts} disabled={!ttsSettingsLoaded} /> Enable TTS
         </label>
         <span style={{ marginLeft: 12, color: ttsEnabled ? '#2ecc40' : '#ff4d4f' }}>
           TTS is {ttsEnabled ? 'ON' : 'OFF'}
         </span>
+        <button
+          type="button"
+          style={{ marginLeft: 24, background: '#3a8dde', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', fontWeight: 500, cursor: 'pointer' }}
+          onClick={openBlocklistModal}
+        >
+          Edit TTS Blocklist
+        </button>
       </div>
       <div style={{ marginBottom: 16 }}>
         <label>
