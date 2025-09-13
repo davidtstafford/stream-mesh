@@ -150,7 +150,6 @@ class TTSQueue extends EventEmitter {
 
       // Only broadcast and play if synthesis succeeded (not blocked)
       if (filePath) {
-        console.log('[TTSQueue] DEBUG: filePath before broadcast/play:', filePath);
         // Broadcast to OBS TTS overlays (use a file URL that browser can access)
         const fileName = path.basename(filePath);
         const audioUrl = `/tts-audio/${fileName}`;

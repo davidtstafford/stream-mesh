@@ -1,4 +1,3 @@
-console.log('[Polly] LIVE CODE EXECUTED');
 // AWS Polly TTS service for Stream Mesh
 import Polly = require('aws-sdk/clients/polly');
 import fs from 'fs';
@@ -85,18 +84,14 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
   const ttsSettingsPath = path.join(userDataPath, 'ttsSettings.json');
   if (fs.existsSync(ttsSettingsPath)) {
     const ttsSettings = JSON.parse(fs.readFileSync(ttsSettingsPath, 'utf-8'));
-    console.log('[Polly] Loaded blocklist for TTS:', ttsSettings.blocklist);
     if (Array.isArray(ttsSettings.blocklist) && ttsSettings.blocklist.length > 0) {
       const lowerText = text.toLowerCase();
       for (const phrase of ttsSettings.blocklist) {
         if (phrase && lowerText.includes(phrase.toLowerCase())) {
-          console.log('[Polly] Blocking TTS for message:', text, 'Matched blocklist phrase:', phrase);
           throw new Error('TTS blocked: message matches blocklist');
         }
       }
     }
-  } else {
-    console.log('[Polly] No ttsSettings.json found for blocklist check.');
   }
   // ...existing code...
   if (!polly || !pollyConfig) {
@@ -280,7 +275,6 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       result = await polly.synthesizeSpeech(params).promise();
       if (!result.AudioStream) throw new Error('No audio stream returned');
       filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.wav`);
-      console.log('[Polly] DEBUG: About to write WAV file:', filePath);
       // Write WAV header + PCM data
       const pcmBuffer = Buffer.from(result.AudioStream as Buffer);
       const wavBuffer = pcmToWav(pcmBuffer, 16000, 1);
@@ -297,7 +291,6 @@ export async function synthesizeSpeech(text: string, voiceId?: string, engine?: 
       result = await polly.synthesizeSpeech(params).promise();
       if (!result.AudioStream) throw new Error('No audio stream returned');
       filePath = path.join(userDataDir, `streammesh_tts_${Date.now()}.mp3`);
-      console.log('[Polly] DEBUG: About to write MP3 file:', filePath);
       fs.writeFileSync(filePath, Buffer.from(result.AudioStream as Buffer));
     }
     

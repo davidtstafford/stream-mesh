@@ -165,6 +165,9 @@ interface TTSSettings {
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
   blocklist?: string[]; // List of phrases that block TTS if present
+  enableEmojis?: boolean; // Enable emoji reading
+  enableEmotes?: boolean; // Enable emote reading
+  maxRepeatedEmotes?: number; // Max repeated emotes
 }
 
 function loadTTSSettings(): TTSSettings {
@@ -182,10 +185,24 @@ function loadTTSSettings(): TTSSettings {
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
       disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
       blocklist: Array.isArray(parsed.blocklist) ? parsed.blocklist : [],
+      enableEmojis: typeof parsed.enableEmojis === 'boolean' ? parsed.enableEmojis : true,
+      enableEmotes: typeof parsed.enableEmotes === 'boolean' ? parsed.enableEmotes : true,
+      maxRepeatedEmotes: typeof parsed.maxRepeatedEmotes === 'number' ? parsed.maxRepeatedEmotes : 3,
     };
   } catch {
-    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3
-    return { enabled: false, readNameBeforeMessage: false, includePlatformWithName: false, maxRepeatedChars: 3, maxRepeatedEmojis: 3, skipLargeNumbers: false, disableNeuralVoices: false };
+    // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3, emotes/emojis enabled, maxRepeatedEmotes = 3
+    return {
+      enabled: false,
+      readNameBeforeMessage: false,
+      includePlatformWithName: false,
+      maxRepeatedChars: 3,
+      maxRepeatedEmojis: 3,
+      skipLargeNumbers: false,
+      disableNeuralVoices: false,
+      enableEmojis: true,
+      enableEmotes: true,
+      maxRepeatedEmotes: 3
+    };
   }
 }
 
