@@ -562,6 +562,28 @@ class CommandProcessor extends EventEmitter {
     };
 
     this.systemCommands.set('~voices', voicesCommand);
+    // ~commands command (same pattern as ~voices)
+    const commandsCommand: SystemCommand = {
+      command: '~commands',
+      enabled: true,
+      description: 'Shows link to the Stream Mesh commands list',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const response = `@${event.user} View all Stream Mesh chat commands here: https://stream-mesh-website.web.app/commands.html`;
+          await this.sendCommandResponse(response, '~commands', event.platform);
+        } catch (error) {
+          console.error('[CommandProcessor] Error in ~commands command:', error);
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to retrieve commands information.`,
+            '~commands',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~commands', commandsCommand);
 
     // ~setvoice command
     const setvoiceCommand: SystemCommand = {
