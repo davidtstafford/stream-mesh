@@ -258,7 +258,8 @@
             <p>Generated for StreamMesh • <strong>94 total voices</strong> across multiple languages and engines</p>
         </div>
     </div>
-
+    <!-- Global audio player (hidden) -->
+    <audio id="voice-audio-player" style="display:none;"></audio>
     <script>
         const voices = [
             {"Name":"Nicole","LanguageName":"Australian English","LanguageCode":"en-AU","Engines":["standard"]},
@@ -377,6 +378,31 @@
             });
         }
 
+        let currentAudioVoice = null;
+        function playVoiceSampleDynamic(voiceName, button) {
+            const audio = document.getElementById('voice-audio-player');
+            const src = `voices/${voiceName}.mp3`;
+            if (audio.src.endsWith(src) && !audio.paused) {
+                audio.pause();
+                audio.currentTime = 0;
+                button.textContent = '▶️ Play Sample';
+                currentAudioVoice = null;
+                return;
+            }
+            audio.src = src;
+            audio.style.display = 'block';
+            audio.play();
+            if (currentAudioVoice) {
+                currentAudioVoice.textContent = '▶️ Play Sample';
+            }
+            button.textContent = '⏸️ Pause';
+            currentAudioVoice = button;
+            audio.onended = () => {
+                button.textContent = '▶️ Play Sample';
+                currentAudioVoice = null;
+            };
+        }
+
         function createVoiceCard(voice) {
             const card = document.createElement('div');
             card.className = 'voice-card';
@@ -385,11 +411,17 @@
                 `<span class="engine-tag engine-${engine}">${engine}</span>`
             ).join('');
             
+            // Play button only, no per-card audio element
+            const audioHtml = `
+                <button onclick="playVoiceSampleDynamic('${voice.Name}', this)" style="margin-top:10px;">▶️ Play Sample</button>
+            `;
+            
             card.innerHTML = `
                 <div class="voice-name">${voice.Name}</div>
                 <div class="voice-language">${voice.LanguageName}</div>
                 <div class="voice-code">${voice.LanguageCode}</div>
                 <div class="engines">${enginesHTML}</div>
+                ${audioHtml}
             `;
             
             return card;
