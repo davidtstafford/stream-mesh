@@ -164,7 +164,7 @@ interface TTSSettings {
   skipLargeNumbers?: boolean; // Skip large numbers (6+ digits) in TTS
   muteWhenActiveSource?: boolean; // Mute native playback if overlays are connected
   disableNeuralVoices?: boolean; // New: disables neural voices in UI/backend
-  // Future: per-user overrides, blocklist, message prefix, etc.
+  blocklist?: string[]; // List of phrases that block TTS if present
 }
 
 function loadTTSSettings(): TTSSettings {
@@ -181,6 +181,7 @@ function loadTTSSettings(): TTSSettings {
       skipLargeNumbers: typeof parsed.skipLargeNumbers === 'boolean' ? parsed.skipLargeNumbers : false,
       muteWhenActiveSource: typeof parsed.muteWhenActiveSource === 'boolean' ? parsed.muteWhenActiveSource : false,
       disableNeuralVoices: typeof parsed.disableNeuralVoices === 'boolean' ? parsed.disableNeuralVoices : false,
+      blocklist: Array.isArray(parsed.blocklist) ? parsed.blocklist : [],
     };
   } catch {
     // Default: TTS off, no name prefix, no platform, maxRepeatedChars = 3, maxRepeatedEmojis = 3
@@ -733,11 +734,24 @@ app.whenReady().then(async () => {
   });
 
   // TTS settings IPC handlers
+  ipcMain.handle('tts:getBlocklist', async () => {
+    const settings = loadTTSSettings();
+    return Array.isArray(settings.blocklist) ? settings.blocklist : [];
+  });
+  ipcMain.handle('tts:setBlocklist', async (_event, blocklist: string[]) => {
+    const settings = loadTTSSettings();
+    settings.blocklist = Array.isArray(blocklist) ? blocklist : [];
+    saveTTSSettings(settings);
+    return true;
+  });
   ipcMain.handle('tts:getSettings', async () => {
     return loadTTSSettings();
   });
   ipcMain.handle('tts:setSettings', async (_event, settings: TTSSettings) => {
-    saveTTSSettings(settings);
+    // Always preserve the current blocklist unless explicitly set
+    const current = loadTTSSettings();
+    const merged = { ...settings, blocklist: Array.isArray(settings.blocklist) ? settings.blocklist : (current.blocklist || []) };
+    saveTTSSettings(merged);
     return true;
   });
 
