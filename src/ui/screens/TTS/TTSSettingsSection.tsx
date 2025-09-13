@@ -8,7 +8,9 @@ const BlocklistModal: React.FC<{
   setBlocklist: (list: string[]) => void;
 }> = ({ open, onClose, blocklist, setBlocklist }) => {
   const [input, setInput] = useState('');
+  const [filter, setFilter] = useState('');
   if (!open) return null;
+  const filteredBlocklist = filter.trim() ? blocklist.filter(word => word.toLowerCase().includes(filter.trim().toLowerCase())) : blocklist;
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000 }}>
       <div style={{ maxWidth: 420, margin: '120px auto', background: '#181c20', padding: 24, borderRadius: 8, color: '#fff', boxShadow: '0 2px 16px #0008' }}>
@@ -35,12 +37,21 @@ const BlocklistModal: React.FC<{
             style={{ padding: '8px 16px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none' }}
           >Add</button>
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <input
+            type="text"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Filter blocklist..."
+            style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #444', background: '#23272b', color: '#fff' }}
+          />
+        </div>
         <ul style={{ maxHeight: 180, overflowY: 'auto', padding: 0, margin: 0, listStyle: 'none' }}>
-          {blocklist.map((word, i) => (
+          {filteredBlocklist.map((word, i) => (
             <li key={word + i} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ flex: 1, color: '#fff', fontSize: 15 }}>{word}</span>
               <button
-                onClick={() => setBlocklist(blocklist.filter((_, idx) => idx !== i))}
+                onClick={() => setBlocklist(blocklist.filter((_, idx) => idx !== blocklist.indexOf(word)))}
                 style={{ marginLeft: 8, background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 13 }}
               >Remove</button>
             </li>

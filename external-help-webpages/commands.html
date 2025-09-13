@@ -33,19 +33,26 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td><code>~voices</code></td><td>Shows a link to the full list of available TTS voices.</td><td>Viewer</td></tr>
-        <tr><td><code>~setvoice [voice]</code></td><td>Set your personal TTS voice. Example: <code>~setvoice Brian</code></td><td>Viewer</td></tr>
-        <tr><td><code>~myvoice</code></td><td>Show your current TTS voice setting.</td><td>Viewer</td></tr>
-        <tr><td><code>~viewervoice @user</code></td><td>Show another user's current TTS voice.</td><td>Viewer</td></tr>
-        <tr><td><code>~setviewervoice @user [voice]</code></td><td>Set another user's TTS voice. Example: <code>~setviewervoice @user Brian</code></td><td>Super Mod</td></tr>
-        <tr><td><code>~enabletts on|off</code></td><td>Enable or disable global TTS for the channel.</td><td>Super Mod</td></tr>
-        <tr><td><code>~enablevoice @user on|off</code></td><td>Enable or disable TTS for a specific user.</td><td>Mod</td></tr>
-        <tr><td><code>~setperm @user viewer|mod|smod</code></td><td>Set a user's permission level.</td><td>Super Mod</td></tr>
-        <tr><td><code>~hello</code></td><td>Replies with a hello message.</td><td>Viewer</td></tr>
-        <tr><td><code>~commands</code></td><td>Shows this commands list link.</td><td>Viewer</td></tr>
+  <tr><td><code>~voices</code></td><td>Shows a link to the full list of available TTS voices.</td><td>Viewer</td></tr>
+  <tr><td><code>~setvoice [voice]</code></td><td>Set your personal TTS voice. Example: <code>~setvoice Brian</code></td><td>Viewer</td></tr>
+  <tr><td><code>~myvoice</code></td><td>Show your current TTS voice setting.</td><td>Viewer</td></tr>
+  <tr><td><code>~viewervoice @user</code></td><td>Show another user's current TTS voice.</td><td>Viewer</td></tr>
+  <tr><td><code>~setviewervoice @user [voice]</code></td><td>Set another user's TTS voice. Example: <code>~setviewervoice @user Brian</code></td><td>Super Mod</td></tr>
+  <tr><td><code>~enabletts on|off</code></td><td>Enable or disable global TTS for the channel.</td><td>Super Mod</td></tr>
+  <tr><td><code>~enablevoice @user on|off</code></td><td>Enable or disable TTS for a specific user.</td><td>Mod</td></tr>
+  <tr><td><code>~setperm @user viewer|mod|smod</code></td><td>Set a user's permission level.</td><td>Super Mod</td></tr>
+  <tr><td><code>~blocklist</code></td><td>Show all blocked words and phrases for TTS.</td><td>Mod</td></tr>
+  <tr><td><code>~blockadd &lt;word or phrase&gt;</code></td><td>Add a word or phrase to the TTS blocklist. Example: <code>~blockadd gamble</code> or <code>~blockadd fuck you</code></td><td>Mod</td></tr>
+  <tr><td><code>~blockremove &lt;word or phrase&gt;</code></td><td>Remove a word or phrase from the TTS blocklist. Example: <code>~blockremove gamble</code> or <code>~blockremove fuck you</code></td><td>Mod</td></tr>
+  <tr><td><code>~blocksearch &lt;term&gt;</code></td><td>Search the blocklist for entries containing a substring. Example: <code>~blocksearch gamble</code> finds <code>gamble</code> and <code>gambler</code>.</td><td>Mod</td></tr>
+  <tr><td><code>~hello</code></td><td>Replies with a hello message.</td><td>Viewer</td></tr>
+  <tr><td><code>~commands</code></td><td>Shows this commands list link.</td><td>Viewer</td></tr>
       </tbody>
     </table>
-    <p style="margin-top:32px; color:#aaa; font-size:0.95em;">For a full list of TTS voices, use <code>~voices</code> or visit <a href="https://stream-mesh-website.web.app/voices.html" style="color:#7ed957;">voices.html</a>.</p>
+    <p style="margin-top:32px; color:#aaa; font-size:0.95em;">
+      <b>Blocklist notes:</b> Blocked words/phrases are matched case-insensitively, anywhere in the message. You can block or remove multi-word phrases.<br>
+      For a full list of TTS voices, use <code>~voices</code> or visit <a href="https://stream-mesh-website.web.app/voices.html" style="color:#7ed957;">voices.html</a>.
+    </p>
   </div>
 </body>
 </html>
