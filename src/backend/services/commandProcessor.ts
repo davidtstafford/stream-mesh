@@ -84,7 +84,7 @@ class CommandProcessor extends EventEmitter {
           if (!targetUserId) {
             const { db } = require('../core/database');
             const row = await new Promise<any>((resolve) => {
-              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+              db.get('SELECT platform_key FROM viewers WHERE LOWER(name) = LOWER(?) AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
                 resolve(row);
               });
             });
@@ -228,7 +228,7 @@ class CommandProcessor extends EventEmitter {
           if (!targetUserId) {
             const { db } = require('../core/database');
             const row = await new Promise<any>((resolve) => {
-              db.get('SELECT platform_key FROM viewers WHERE name = ? AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
+              db.get('SELECT platform_key FROM viewers WHERE LOWER(name) = LOWER(?) AND platform = ?', [targetUsername, event.platform], (err: Error | null, row: any) => {
                 resolve(row);
               });
             });
