@@ -1,3 +1,18 @@
+// Main Electron process
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import * as path from 'path';
+// Use require instead of import for potentially problematic packages
+const isDev = require('electron-is-dev');
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
+import { platformIntegrationService } from './backend/services/platformIntegration';
+import { startTwitchOAuth, clearTwitchSession } from './backend/services/twitchOAuth';
+import { startKickOAuth, validateKickToken, refreshKickToken, clearKickSession } from './backend/services/kickOAuth';
+import { eventBus } from './backend/services/eventBus';
+import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
+import { ttsQueue } from './backend/services/ttsQueue';
+import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
+import { commandProcessor } from './backend/services/commandProcessor';
+
 // --- Gang Wars IPC handlers ---
 import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang } from './backend/gangwars/core';
 
@@ -44,20 +59,6 @@ ipcMain.handle('gangwars:renameGang', async (_event, gangId: string, newName: st
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
-// Main Electron process
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import * as path from 'path';
-// Use require instead of import for potentially problematic packages
-const isDev = require('electron-is-dev');
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
-import { platformIntegrationService } from './backend/services/platformIntegration';
-import { startTwitchOAuth, clearTwitchSession } from './backend/services/twitchOAuth';
-import { startKickOAuth, validateKickToken, refreshKickToken, clearKickSession } from './backend/services/kickOAuth';
-import { eventBus } from './backend/services/eventBus';
-import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/services/awsPolly';
-import { ttsQueue } from './backend/services/ttsQueue';
-import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
-import { commandProcessor } from './backend/services/commandProcessor';
 
 // Use require for Node.js built-in modules and potentially problematic packages
 const fs = require('fs');
@@ -298,6 +299,7 @@ function saveCommandSettings(settings: CommandSettings) {
 }
 
 function createWindow() {
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -322,11 +324,11 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:3000').catch(err => {
+    win.loadURL('http://localhost:3000').catch((err: any) => {
       console.error('Failed to load dev server:', err);
     });
   } else {
-    win.loadFile(path.join(__dirname, 'index.html')).catch(err => {
+    win.loadFile(path.join(__dirname, 'index.html')).catch((err: any) => {
       console.error('Failed to load index.html:', err);
     });
   }
