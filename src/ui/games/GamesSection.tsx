@@ -55,6 +55,7 @@ function GangWarsTabs() {
   const [currencyName, setCurrencyName] = useState('Coins');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [passiveIncomeAmount, setPassiveIncomeAmount] = useState(25);
 
   // Load settings on mount
   useEffect(() => {
@@ -64,6 +65,7 @@ function GangWarsTabs() {
         if (result && result.success) {
           setCurrencyName(result.settings.currencyName || 'Coins');
           setGameEnabled(typeof result.settings.gameEnabled === 'boolean' ? result.settings.gameEnabled : true);
+          setPassiveIncomeAmount(typeof result.settings.passiveIncomeAmount === 'number' ? result.settings.passiveIncomeAmount : 25);
           setSettingsLoaded(true);
         } else {
           setSettingsError(result && result.error ? result.error : 'Failed to load settings');
@@ -83,11 +85,12 @@ function GangWarsTabs() {
         await window.electron.ipcRenderer.invoke('gangwars:setSettings', {
           currencyName,
           gameEnabled,
+          passiveIncomeAmount,
         });
       } catch {}
     };
     save();
-  }, [currencyName, gameEnabled, settingsLoaded]);
+  }, [currencyName, gameEnabled, passiveIncomeAmount, settingsLoaded]);
 
   return (
     <div style={{ background: '#23272e', borderRadius: 12, padding: 32, maxWidth: 900, margin: '0 auto' }}>
@@ -121,6 +124,16 @@ function GangWarsTabs() {
                 onChange={e => setCurrencyName(e.target.value)}
                 style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff', minWidth: 80 }}
                 maxLength={16}
+              />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 500 }}>Passive Income (per 30 min):</span>
+              <input
+                type="number"
+                min={0}
+                value={passiveIncomeAmount}
+                onChange={e => setPassiveIncomeAmount(Number(e.target.value))}
+                style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff', width: 80 }}
               />
             </label>
           </div>

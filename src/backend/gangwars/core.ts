@@ -577,15 +577,46 @@ export function gwAdminGiveCurrency(playerId: string, amount: number): Promise<{
 // Player registration
 export function gwRegisterPlayer(playerId: string, name: string, isSuperMod: boolean = false): Promise<void> {
   return new Promise((resolve, reject) => {
+    const now = Date.now();
     db.run(
-    `INSERT OR IGNORE INTO gw_players (id, name, is_supermod, currency, inventory) VALUES (?, ?, ?, ?, ?)` ,
-    [playerId, name, isSuperMod ? 1 : 0, 100, JSON.stringify({ bat: 1 })],
+      `INSERT OR IGNORE INTO gw_players (id, name, is_supermod, currency, inventory, lastPassiveIncomeAt) VALUES (?, ?, ?, ?, ?, ?)` ,
+      [playerId, name, isSuperMod ? 1 : 0, 100, JSON.stringify({ bat: 1 }), now],
       (err) => {
         if (err) reject(err);
         else resolve();
       }
     );
   });
+}
+
+// Collect passive income for a player
+export async function gwCollectPassiveIncome(playerId: string): Promise<{ collected: number; nextIn: number }> {
+  const settings = loadGangWarsSettings();
+  const passiveIncomeAmount = typeof settings.passiveIncomeAmount === 'number' ? settings.passiveIncomeAmount : 25;
+  const now = Date.now();
+  const player: any = await gwGetPlayer(playerId);
+  if (!player) return { collected: 0, nextIn: 30 * 60 * 1000 };
+  // Add lastPassiveIncomeAt column if missing
+  if (typeof player.lastPassiveIncomeAt !== 'number') {
+    await new Promise(res => db.run('ALTER TABLE gw_players ADD COLUMN lastPassiveIncomeAt INTEGER', res));
+    player.lastPassiveIncomeAt = 0;
+  }
+  const interval = 30 * 60 * 1000;
+  let last = typeof player.lastPassiveIncomeAt === 'number' ? player.lastPassiveIncomeAt : 0;
+  // If lastPassiveIncomeAt is missing or zero, set it to now and do not pay out
+  if (!last || last < 1000000000000) { // sanity check for timestamp
+    await new Promise(res => db.run('UPDATE gw_players SET lastPassiveIncomeAt = ? WHERE id = ?', [now, playerId], res));
+    return { collected: 0, nextIn: interval };
+  }
+  const elapsed = now - last;
+  const intervals = Math.floor(elapsed / interval);
+  if (intervals <= 0) {
+    // Not enough time has passed
+    return { collected: 0, nextIn: interval - elapsed };
+  }
+  const amount = intervals * passiveIncomeAmount;
+  await new Promise(res => db.run('UPDATE gw_players SET currency = currency + ?, lastPassiveIncomeAt = ? WHERE id = ?', [amount, last + intervals * interval, playerId], res));
+  return { collected: amount, nextIn: interval };
 }
 
 // Gang creation

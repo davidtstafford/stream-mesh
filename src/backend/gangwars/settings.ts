@@ -7,11 +7,13 @@ const settingsFile = path.join(app.getPath('userData'), 'gangwarsSettings.json')
 export interface GangWarsSettings {
   currencyName: string;
   gameEnabled: boolean;
+  passiveIncomeAmount?: number;
 }
 
 const defaultSettings: GangWarsSettings = {
   currencyName: 'Coins',
   gameEnabled: true,
+  passiveIncomeAmount: 25,
 };
 
 export function loadGangWarsSettings(): GangWarsSettings {

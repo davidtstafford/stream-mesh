@@ -99,6 +99,16 @@ export async function handleGangWarsCommand(
   // Always use isSuperMod from chat event for admin permission checks
   let result;
   switch (command) {
+    case 'collect': {
+      // Player collects passive income for all full 30-min intervals since last collection
+      const result = await require('./core').gwCollectPassiveIncome(user.id);
+      if (result.collected > 0) {
+        return `@${user.name} You collected ${formatCurrency(result.collected)} in passive income!`;
+      } else {
+        const mins = Math.ceil(result.nextIn / 60000);
+        return `@${user.name} No passive income available yet. Next in ~${mins} min.`;
+      }
+    }
     case 'promote': {
       // God Father can promote a Grunt to Lieutenant, or a Lieutenant to God Father (demoting self)
       if (!args[0]) return `@${user.name} Usage: ~gw promote <username>`;
@@ -124,12 +134,18 @@ export async function handleGangWarsCommand(
       }
     }
     case 'stats': {
-      // Show player stats
-      const player = await require('./core').gwGetPlayer(user.id);
-      if (!player) return `@${user.name} You are not registered in Gang Wars.`;
-  let msg = `@${user.name} Stats: Coins: ${formatCurrency(player.currency)} | Wins: ${player.wins}`;
-      if (player.gang_id) {
-        const gang = await require('./core').gwGetGang(player.gang_id);
+      // Show player stats, optionally for another user
+      let targetPlayer = null;
+      if (args[0]) {
+        targetPlayer = await gwResolvePlayer(args[0]);
+        if (!targetPlayer) return `@${user.name} Player not found.`;
+      } else {
+        targetPlayer = await require('./core').gwGetPlayer(user.id);
+        if (!targetPlayer) return `@${user.name} You are not registered in Gang Wars.`;
+      }
+      let msg = `@${targetPlayer.name} Stats: Coins: ${formatCurrency(targetPlayer.currency)} | Wins: ${targetPlayer.wins}`;
+      if (targetPlayer.gang_id) {
+        const gang = await require('./core').gwGetGang(targetPlayer.gang_id);
         if (gang) msg += ` | Gang: ${gang.name}`;
       }
       return msg;

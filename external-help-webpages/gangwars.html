@@ -26,10 +26,11 @@
       <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code> <span style="color:#aaa">(Sends a join request; must be approved)</span></li>
       <li>Leave your gang: <code>~gw leavegang</code></li>
   <li>Disband your gang: <code>~gw disbandgang</code> <span style="color:#aaa">(God Father only)</span></li>
-  <li>See your stats: <code>~gw stats</code></li>
+  <li>See player stats: <code>~gw stats [@username]</code> <span style="color:#aaa">(Shows your stats, or another player's if specified)</span></li>
   <li>See your inventory: <code>~gw inventory</code></li>
   <li>Quit and delete your account: <code>~gw quit</code></li>
   <li>New players start with 100 coins and a bat.</li>
+  <li>Collect passive income: <code>~gw collect</code> <span style="color:#aaa">(Claim coins for all full 30-min intervals since last collection)</span></li>
     </ul>
     <h2>Gang Management & Requests</h2>
     <ul>
@@ -42,6 +43,7 @@
     <ul>
       <li>Deposit: <code>~gw deposit &lt;amount&gt;</code></li>
       <li>Withdraw: <code>~gw withdraw &lt;amount&gt;</code> <span style="color:#aaa">(Lieutenant: up to 10% of bank, God Father: any amount, Grunt: must request approval)</span></li>
+  <li>Passive income: Use <code>~gw collect</code> to claim your coins. The default is 25 coins per 30 minutes, but the broadcaster can change this in the UI.</li>
     </ul>
     <h2>Weapons & Inventory</h2>
     <ul>
@@ -93,6 +95,7 @@
     <h2>Tips & Info</h2>
     <ul>
       <li>Currency name and game status can be set by the broadcaster in the Games tab.</li>
+  <li>Passive income amount is also configurable in the Games tab. Default is 25 coins per 30 minutes.</li>
       <li>Major events are announced in chat and via TTS overlays.</li>
       <li>Check the Games tab in the Stream Mesh app for leaderboards and more info.</li>
   <li>All user and gang lookups are robust: you can use username, @username, or ID, and gang names are case/space-insensitive.</li>
