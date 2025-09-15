@@ -14,7 +14,16 @@ import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 import { commandProcessor } from './backend/services/commandProcessor';
 import { loadGangWarsSettings, saveGangWarsSettings, GangWarsSettings } from './backend/gangwars/settings';
-import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang, gwListJoinRequests, gwDeletePlayer } from './backend/gangwars/core';
+import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang, gwListJoinRequests, gwDeletePlayer, gwAdminReset } from './backend/gangwars/core';
+// Admin reset game
+ipcMain.handle('gangwars:adminReset', async () => {
+  try {
+    const result = await gwAdminReset();
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
 // Delete a player (Super Mod only)
 ipcMain.handle('gangwars:deletePlayer', async (_event, requesterId: string, playerId: string) => {
   try {

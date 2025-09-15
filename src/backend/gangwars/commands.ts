@@ -90,8 +90,7 @@ export async function handleGangWarsCommand(
   args: string[],
   isSuperMod: boolean
 ) {
-  // Force mod status sync for the user before any command (gwListPlayers syncs is_supermod)
-  await require('./core').gwListPlayers();
+  // Always use isSuperMod from chat event for admin permission checks
   let result;
   switch (command) {
     case 'leaderboard': {

@@ -10,6 +10,15 @@ type JoinRequest = { id: string; player_id: string; gang_id: string; timestamp: 
 // --- Main Games Section with sub-tabs ---
 export function GamesSection() {
   const [activeTab, setActiveTab] = useState<'gangwars'>('gangwars');
+  // Admin Reset Game button
+  const [resetStatus, setResetStatus] = useState<string | null>(null);
+  const handleResetGame = async () => {
+    setResetStatus(null);
+    const res = await window.electron.ipcRenderer.invoke('gangwars:adminReset');
+    if (res && res.success) setResetStatus('Game reset successfully!');
+    else setResetStatus(res && res.error ? res.error : 'Failed to reset game');
+  };
+
   return (
     <div>
       <h1>Games</h1>
@@ -31,7 +40,9 @@ export function GamesSection() {
           Gang Wars
         </button>
         {/* Add more game tabs here in the future */}
+        <button onClick={handleResetGame} style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 28px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Reset Game</button>
       </div>
+      {resetStatus && <div style={{ color: resetStatus.includes('success') ? '#8fda8f' : '#dc3545', marginBottom: 12 }}>{resetStatus}</div>}
       {activeTab === 'gangwars' && <GangWarsTabs />}
     </div>
   );
@@ -39,11 +50,6 @@ export function GamesSection() {
 
 // --- Gang Wars Section with sub-tabs ---
 function GangWarsTabs() {
-  // Chat command feedback state
-  const [commandStatus, setCommandStatus] = useState<string | null>(null);
-  const [commandInput, setCommandInput] = useState('');
-  const [commandLoading, setCommandLoading] = useState(false);
-
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'gangs' | 'players'>('overview');
   const [gameEnabled, setGameEnabled] = useState(true);
   const [currencyName, setCurrencyName] = useState('Coins');
@@ -83,48 +89,8 @@ function GangWarsTabs() {
     save();
   }, [currencyName, gameEnabled, settingsLoaded]);
 
-  // Send chat command via IPC (assumes a handler exists, or just simulate feedback)
-  async function sendChatCommand(cmd: string) {
-    setCommandLoading(true);
-    setCommandStatus(null);
-    try {
-      const result = await window.electron.ipcRenderer.invoke('gangwars:sendChatCommand', cmd);
-      if (result && result.success) {
-        setCommandStatus(`Command sent: ${cmd}`);
-      } else {
-        setCommandStatus(result && result.error ? result.error : 'Failed to send command');
-      }
-    } catch (e) {
-      setCommandStatus('Failed to send command');
-    } finally {
-      setCommandLoading(false);
-    }
-  }
-
   return (
     <div style={{ background: '#23272e', borderRadius: 12, padding: 32, maxWidth: 900, margin: '0 auto' }}>
-      {/* Notification area for chat command feedback */}
-      {commandStatus && (
-        <div style={{ background: '#23272e', color: '#8fda8f', border: '1px solid #3a8dde', borderRadius: 6, padding: 10, marginBottom: 16 }}>
-          {commandStatus}
-        </div>
-      )}
-      {/* Simple chat command input */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <input
-          type="text"
-          value={commandInput}
-          onChange={e => setCommandInput(e.target.value)}
-          placeholder="Type chat command (e.g. ~gw register)"
-          style={{ flex: 1, padding: '6px 12px', borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff' }}
-          disabled={commandLoading}
-        />
-        <button
-          onClick={() => { if (commandInput.trim()) { sendChatCommand(commandInput.trim()); setCommandInput(''); } }}
-          style={{ padding: '6px 18px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none', fontWeight: 600, fontSize: 15, cursor: commandLoading ? 'not-allowed' : 'pointer', opacity: commandLoading ? 0.6 : 1 }}
-          disabled={commandLoading || !commandInput.trim()}
-        >Send</button>
-      </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <button
           onClick={() => setActiveSubTab('overview')}

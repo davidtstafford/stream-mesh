@@ -81,11 +81,16 @@ class CommandProcessor extends EventEmitter {
           // Check if user is supermod (reuse permission logic)
           let isSuperMod = false;
           if (event.tags?.role === 'super_moderator') isSuperMod = true;
-          // Call handler and get response
-          const response = await handleGangWarsCommand(user, subcommand, args.slice(1), isSuperMod);
-          if (response) {
-            await this.sendCommandResponse(response, '~gw', event.platform);
-          }
+          // Sync Super Mod status into player profile before handling command
+          const { db } = require('../core/database');
+          db.run('UPDATE gw_players SET is_supermod = ? WHERE id = ?', [isSuperMod ? 1 : 0, user.id], () => {
+            // Call handler and get response
+            handleGangWarsCommand(user, subcommand, args.slice(1), isSuperMod).then(async (response: string) => {
+              if (response) {
+                await this.sendCommandResponse(response, '~gw', event.platform);
+              }
+            });
+          });
         } catch (err) {
           await this.sendCommandResponse(
             `@${event.user} Sorry, failed to process Gang Wars command.`,
