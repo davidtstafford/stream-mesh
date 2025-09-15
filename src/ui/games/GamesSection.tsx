@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-type Gang = { id: string; name: string; members: number; bank: number; wins: number };
-type Player = { id: string; name: string; currency: number; gang: string; wins: number; is_supermod: boolean };
+type Gang = { id: string; name: string; members: string[]; bank: number; wins: number };
+type Player = { id: string; name: string; currency: number; gang_id?: string; wins: number; is_supermod: boolean; role?: string };
+type JoinRequest = { id: string; player_id: string; gang_id: string; timestamp: string };
 // Gang Wars UI scaffold for Games section and Gang Wars sub-tab
 // This is a placeholder React component structure for the new UI section.
 
@@ -183,29 +184,44 @@ function subTabBtnStyle(active: boolean): React.CSSProperties {
 // --- Gangs Management Tab ---
 function GangsTab() {
   const [gangs, setGangs] = useState<Gang[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [requests, setRequests] = useState<{ [gangId: string]: JoinRequest[] }>({});
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchGangs();
+    fetchAll();
   }, []);
 
-  async function fetchGangs() {
+  async function fetchAll() {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.electron.ipcRenderer.invoke('gangwars:listGangs');
-      if (result && result.success) {
-        setGangs(result.gangs || []);
+      const [gangRes, playerRes] = await Promise.all([
+        window.electron.ipcRenderer.invoke('gangwars:listGangs'),
+        window.electron.ipcRenderer.invoke('gangwars:listPlayers'),
+      ]);
+      if (gangRes && gangRes.success && playerRes && playerRes.success) {
+        setGangs(gangRes.gangs || []);
+        setPlayers(playerRes.players || []);
+        // Fetch join requests for each gang
+        const reqs: { [gangId: string]: JoinRequest[] } = {};
+        for (const gang of gangRes.gangs || []) {
+          const r = await window.electron.ipcRenderer.invoke('gangwars:listJoinRequests', gang.id);
+          reqs[gang.id] = r && r.success ? r.requests || [] : [];
+        }
+        setRequests(reqs);
       } else {
-        setError(result && result.error ? result.error : 'Failed to load gangs');
+        setError('Failed to load gangs or players');
         setGangs([]);
+        setPlayers([]);
       }
     } catch (e) {
-      setError('Failed to load gangs');
+      setError('Failed to load gangs/players');
       setGangs([]);
+      setPlayers([]);
     } finally {
       setLoading(false);
     }
@@ -214,7 +230,7 @@ function GangsTab() {
   const handleRename = async (id: string) => {
     try {
       await window.electron.ipcRenderer.invoke('gangwars:renameGang', id, editName);
-      fetchGangs();
+      fetchAll();
     } catch {
       setError('Rename failed');
     }
@@ -223,11 +239,18 @@ function GangsTab() {
   const handleDelete = async (id: string) => {
     try {
       await window.electron.ipcRenderer.invoke('gangwars:deleteGang', id);
-      fetchGangs();
+      fetchAll();
     } catch {
       setError('Delete failed');
     }
   };
+
+  // Helper to get player name/role by id
+  function getPlayerInfo(id: string) {
+    if (!Array.isArray(players)) return id;
+    const p = players.find(pl => pl && pl.id === id);
+    return p ? `${p.name}${p.role ? ' (' + p.role + ')' : ''}` : id;
+  }
 
   return (
     <div>
@@ -236,50 +259,64 @@ function GangsTab() {
       {loading ? (
         <div style={{ color: '#aaa' }}>Loading gangs...</div>
       ) : (
-        <table style={{ width: '100%', background: '#181c20', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
-          <thead>
-            <tr style={{ color: '#fff', background: '#23272e' }}>
-              <th style={{ padding: 12, textAlign: 'left' }}>Name</th>
-              <th style={{ padding: 12 }}>Members</th>
-              <th style={{ padding: 12 }}>Bank</th>
-              <th style={{ padding: 12 }}>Wins</th>
-              <th style={{ padding: 12 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gangs.map((gang: Gang) => (
-              <tr key={gang.id} style={{ color: '#fff', borderBottom: '1px solid #23272e' }}>
-                <td style={{ padding: 12 }}>
-                  {editId === gang.id ? (
-                    <input
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #444', background: '#23272e', color: '#fff' }}
-                    />
-                  ) : (
-                    gang.name
-                  )}
-                </td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{gang.members}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{gang.bank}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{gang.wins}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>
-                  {editId === gang.id ? (
-                    <>
-                      <button onClick={() => handleRename(gang.id)} style={actionBtnStyle(true)}>Save</button>
-                      <button onClick={() => setEditId(null)} style={actionBtnStyle(false)}>Cancel</button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => { setEditId(gang.id); setEditName(gang.name); }} style={actionBtnStyle(true)}>Rename</button>
-                      <button onClick={() => handleDelete(gang.id)} style={actionBtnStyle(false)}>Delete</button>
-                    </>
-                  )}
-                </td>
+        <>
+        {Array.isArray(gangs) && gangs.length > 0 ? (
+          <table style={{ width: '100%', background: '#181c20', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
+            <thead>
+              <tr style={{ color: '#fff', background: '#23272e' }}>
+                <th style={{ padding: 12, textAlign: 'left' }}>Name</th>
+                <th style={{ padding: 12 }}>Members</th>
+                <th style={{ padding: 12 }}>Bank</th>
+                <th style={{ padding: 12 }}>Wins</th>
+                <th style={{ padding: 12 }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {gangs.map((gang: Gang) => (
+                <tr key={gang.id} style={{ color: '#fff', borderBottom: '1px solid #23272e' }}>
+                  <td style={{ padding: 12 }}>{editId === gang.id ? (
+                    <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #444', background: '#23272e', color: '#fff' }} />
+                  ) : gang.name}</td>
+                  <td style={{ padding: 12, textAlign: 'center' }}>
+                    {Array.isArray(gang.members) && gang.members.length > 0
+                      ? gang.members.map(getPlayerInfo).join(', ')
+                      : '—'}
+                  </td>
+                  <td style={{ padding: 12, textAlign: 'center' }}>{gang.bank}</td>
+                  <td style={{ padding: 12, textAlign: 'center' }}>{gang.wins}</td>
+                  <td style={{ padding: 12, textAlign: 'center' }}>
+                    {editId === gang.id ? (
+                      <>
+                        <button onClick={() => handleRename(gang.id)} style={actionBtnStyle(true)}>Save</button>
+                        <button onClick={() => setEditId(null)} style={actionBtnStyle(false)}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => { setEditId(gang.id); setEditName(gang.name); }} style={actionBtnStyle(true)}>Rename</button>
+                        <button onClick={() => handleDelete(gang.id)} style={actionBtnStyle(false)}>Delete</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div style={{ color: '#aaa', marginBottom: 16 }}>No gangs found.</div>
+        )}
+        {/* Show join requests for each gang */}
+        {Array.isArray(gangs) && gangs.map(gang => Array.isArray(requests[gang.id]) && requests[gang.id].length > 0 && (
+          <div key={gang.id + '-requests'} style={{ marginBottom: 24, background: '#23272e', borderRadius: 8, padding: 16 }}>
+            <b style={{ color: '#3a8dde' }}>Join Requests for {gang.name}:</b>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              {requests[gang.id].map(req => {
+                const p = Array.isArray(players) ? players.find(pl => pl && pl.id === req.player_id) : undefined;
+                return <li key={req.id}>{p ? p.name : req.player_id} (requested {req.timestamp ? new Date(req.timestamp).toLocaleString() : 'unknown'})</li>;
+              })}
+            </ul>
+          </div>
+        ))}
+        </>
       )}
     </div>
   );
@@ -303,31 +340,60 @@ function actionBtnStyle(primary: boolean): React.CSSProperties {
 // --- Players Stats Tab ---
 function PlayersTab() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [gangs, setGangs] = useState<Gang[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPlayers();
+    fetchAll();
   }, []);
 
-  async function fetchPlayers() {
+  async function fetchAll() {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.electron.ipcRenderer.invoke('gangwars:listPlayers');
-      if (result && result.success) {
-        setPlayers(result.players || []);
+      const [playerRes, gangRes] = await Promise.all([
+        window.electron.ipcRenderer.invoke('gangwars:listPlayers'),
+        window.electron.ipcRenderer.invoke('gangwars:listGangs'),
+      ]);
+      if (playerRes && playerRes.success && gangRes && gangRes.success) {
+        setPlayers(playerRes.players || []);
+        setGangs(gangRes.gangs || []);
       } else {
-        setError(result && result.error ? result.error : 'Failed to load players');
+        setError('Failed to load players or gangs');
         setPlayers([]);
+        setGangs([]);
       }
     } catch (e) {
-      setError('Failed to load players');
+      setError('Failed to load players/gangs');
       setPlayers([]);
+      setGangs([]);
     } finally {
       setLoading(false);
     }
   }
+
+  function getGangName(gangId: string | undefined) {
+    if (!gangId) return '';
+    const g = gangs.find(g => g.id === gangId);
+    return g ? g.name : gangId;
+  }
+
+
+  // Try to get current user from localStorage (set by app on login), fallback to first player
+  let currentUserId = '';
+  try { currentUserId = localStorage.getItem('currentUserId') || ''; } catch {}
+  const currentUser = players.find(p => p.id === currentUserId) || players.find(p => p.is_supermod) || players[0];
+
+  async function handleRemove(playerId: string) {
+    if (!currentUser) return;
+    const res = await window.electron.ipcRenderer.invoke('gangwars:deletePlayer', currentUser.id, playerId);
+    if (res && res.success) fetchAll();
+    else alert(res && res.error ? res.error : 'Failed to remove player');
+  }
+
+  // The app owner (current user) can always remove any player except themselves
+  const isAppOwner = !!currentUser;
 
   return (
     <div>
@@ -344,16 +410,22 @@ function PlayersTab() {
               <th style={{ padding: 12 }}>Currency</th>
               <th style={{ padding: 12 }}>Wins</th>
               <th style={{ padding: 12 }}>Super Mod</th>
+              {isAppOwner && <th style={{ padding: 12 }}>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {players.map((player: Player) => (
               <tr key={player.id} style={{ color: '#fff', borderBottom: '1px solid #23272e' }}>
                 <td style={{ padding: 12 }}>{player.name}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{player.gang}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>{getGangName(player.gang_id)}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{player.currency}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{player.wins}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{player.is_supermod ? '⭐' : ''}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>{player.is_supermod ? 'Yes' : 'No'}</td>
+                {isAppOwner && (
+                  <td style={{ padding: 12, textAlign: 'center' }}>
+                    <button onClick={() => handleRemove(player.id)} style={actionBtnStyle(false)}>Remove</button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

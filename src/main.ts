@@ -14,7 +14,25 @@ import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 import { commandProcessor } from './backend/services/commandProcessor';
 import { loadGangWarsSettings, saveGangWarsSettings, GangWarsSettings } from './backend/gangwars/settings';
-import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang } from './backend/gangwars/core';
+import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang, gwListJoinRequests, gwDeletePlayer } from './backend/gangwars/core';
+// Delete a player (Super Mod only)
+ipcMain.handle('gangwars:deletePlayer', async (_event, requesterId: string, playerId: string) => {
+  try {
+    const result = await gwDeletePlayer(requesterId, playerId);
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+// List join requests for a gang
+ipcMain.handle('gangwars:listJoinRequests', async (_event, gangId: string) => {
+  try {
+    const requests = await gwListJoinRequests(gangId);
+    return { success: true, requests };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
 
 // ...existing code...
 

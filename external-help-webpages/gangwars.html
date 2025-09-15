@@ -23,13 +23,19 @@
     <ul>
       <li>Register: <code>~gw register</code></li>
       <li>Create a gang: <code>~gw creategang &lt;name&gt;</code></li>
-      <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code></li>
+      <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code> <span style="color:#aaa">(Sends a join request; must be approved)</span></li>
       <li>Leave your gang: <code>~gw leavegang</code></li>
+    </ul>
+    <h2>Gang Management & Requests</h2>
+    <ul>
+      <li>List join requests: <code>~gw listrequests</code> <span style="color:#aaa">(Lieutenant or God Father only)</span></li>
+      <li>Approve join request: <code>~gw approverequest &lt;requestId&gt;</code> <span style="color:#aaa">(Lieutenant or God Father only)</span></li>
+      <li>Kick member: <code>~gw kick &lt;username&gt;</code> <span style="color:#aaa">(God Father only)</span></li>
     </ul>
     <h2>Currency & Banking</h2>
     <ul>
       <li>Deposit: <code>~gw deposit &lt;amount&gt;</code></li>
-      <li>Withdraw: <code>~gw withdraw &lt;amount&gt;</code></li>
+      <li>Withdraw: <code>~gw withdraw &lt;amount&gt;</code> <span style="color:#aaa">(Lieutenant: up to 10% of bank, God Father: any amount, Grunt: must request approval)</span></li>
     </ul>
     <h2>Weapons & Inventory</h2>
     <ul>
@@ -46,10 +52,24 @@
     <ul>
       <li>Leaderboard: <code>~gw leaderboard</code> <span style="color:#aaa">(Top 3 players, top 3 gangs, your rank)</span></li>
     </ul>
-    <h2>Admin Commands (Super Mods Only)</h2>
+    <h2>Admin & Super Mod Commands</h2>
     <ul>
       <li>Reset game: <code>~gw adminreset</code></li>
       <li>Give currency: <code>~gw admingive &lt;player&gt; &lt;amount&gt;</code></li>
+      <li>Delete player: <code>~gw deleteplayer &lt;username&gt;</code> <span style="color:#aaa">(Super Mod only; removes a player from the game)</span></li>
+    </ul>
+    <h2>Super Mod Features</h2>
+    <ul>
+      <li>Super Mod status in Gang Wars is always synchronized with your viewer mod status (mod, supermod, or admin).</li>
+      <li>Super Mods can remove any player from the game using the UI or <code>~gw deleteplayer</code> command.</li>
+      <li>Super Mods see a "Remove" button in the Players tab for all players except themselves.</li>
+      <li>The Players tab now shows "Yes" in the Super Mod column for all super mods.</li>
+    </ul>
+    <h2>Gang Roles & Permissions</h2>
+    <ul>
+      <li><b>God Father</b>: Can approve join requests, kick members, withdraw any amount, disband gang.</li>
+      <li><b>Lieutenant</b>: Can approve join requests, withdraw up to 10% of gang bank.</li>
+      <li><b>Grunt</b>: Can deposit, but must request approval to withdraw. Cannot approve join requests or kick.</li>
     </ul>
     <h2>Tips & Info</h2>
     <ul>

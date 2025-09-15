@@ -8,6 +8,14 @@ export interface GWPlayer {
   inventory: string[];
   wins: number;
   is_supermod: boolean;
+  role?: 'Grunt' | 'Lieutenant' | 'God Father';
+}
+
+export interface GangJoinRequest {
+  id: string;
+  player_id: string;
+  gang_id: string;
+  timestamp: number;
 }
 
 export interface GWGang {

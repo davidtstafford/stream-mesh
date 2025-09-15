@@ -11,7 +11,10 @@ import {
   gwAttackPlayer,
   gwAttackGang,
   gwAdminReset,
-  gwAdminGiveCurrency
+  gwAdminGiveCurrency,
+  gwGetPlayer,
+  gwListJoinRequests,
+  gwApproveJoinRequest
 } from './core';
 import { chatBus } from '../services/chatBus';
 import { ttsQueue } from '../services/ttsQueue';
@@ -87,6 +90,8 @@ export async function handleGangWarsCommand(
   args: string[],
   isSuperMod: boolean
 ) {
+  // Force mod status sync for the user before any command (gwListPlayers syncs is_supermod)
+  await require('./core').gwListPlayers();
   let result;
   switch (command) {
     case 'leaderboard': {
@@ -147,16 +152,55 @@ export async function handleGangWarsCommand(
     case 'register':
       await gwRegisterPlayer(user.id, user.name, isSuperMod);
       return `@${user.name} Registered for Gang Wars!`;
-    case 'creategang':
+    case 'creategang': {
+      // Support multi-word gang names
+      const gangName = args.join(' ').trim();
+      if (!gangName) return `@${user.name} Usage: ~gw creategang <gang name>`;
       try {
-        await gwCreateGang(user.id, args[0]);
-        return `@${user.name} Gang created: ${args[0]}`;
+        await gwCreateGang(user.id, gangName);
+        return `@${user.name} Gang created: ${gangName}`;
       } catch (err: any) {
         return `@${user.name} Gang creation failed: ${err?.message || err}`;
       }
-    case 'joingang':
-      result = await gwJoinGang(user.id, args[0]);
-      return result.success ? `@${user.name} Joined gang!` : `@${user.name} Join failed: ${result.error}`;
+    }
+    case 'joingang': {
+      // Support multi-word gang names
+      const gangName = args.join(' ').trim();
+      if (!gangName) return `@${user.name} Usage: ~gw joingang <gang name>`;
+      // Find gang by name
+      const { db } = require('../core/database');
+      const gang = await new Promise<any>((resolve) => {
+        db.get('SELECT id FROM gw_gangs WHERE LOWER(name) = LOWER(?)', [gangName], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (!gang || !gang.id) return `@${user.name} Join failed: Gang not found`;
+      result = await gwJoinGang(user.id, gang.id);
+      return result.success ? `@${user.name} Requested to join ${gangName}. Awaiting approval.` : `@${user.name} Join failed: ${result.error}`;
+    }
+    case 'listrequests': {
+      // List join requests for your gang (officer or above)
+      const player = await gwGetPlayer(user.id);
+      if (!player || !player.gang_id) return `@${user.name} You are not in a gang!`;
+      if (player.role !== 'Lieutenant' && player.role !== 'God Father') return `@${user.name} Only Lieutenants or God Father can view requests.`;
+      const requests = await gwListJoinRequests(player.gang_id);
+      if (!requests.length) return `@${user.name} No pending join requests.`;
+      const names = await Promise.all(requests.map(async (r: any) => {
+        const p = await gwGetPlayer(r.player_id);
+        return p ? `${p.name} (id: ${r.id})` : `Unknown (id: ${r.id})`;
+      }));
+      return `@${user.name} Pending join requests: ` + names.join(' | ');
+    }
+    case 'approverequest': {
+      // Approve a join request by request id
+      const player = await gwGetPlayer(user.id);
+      if (!player || !player.gang_id) return `@${user.name} You are not in a gang!`;
+      if (player.role !== 'Lieutenant' && player.role !== 'God Father') return `@${user.name} Only Lieutenants or God Father can approve requests.`;
+      const requestId = args[0];
+      if (!requestId) return `@${user.name} Usage: ~gw approverequest <requestId>`;
+      result = await gwApproveJoinRequest(requestId, user.id);
+      return result.success ? `@${user.name} Approved join request.` : `@${user.name} Approve failed: ${result.error}`;
+    }
     case 'leavegang':
       result = await gwLeaveGang(user.id);
       return result.success ? `@${user.name} Left gang.` : `@${user.name} Leave failed: ${result.error}`;
@@ -197,11 +241,30 @@ export async function handleGangWarsCommand(
       }
     }
     case 'attackgang': {
-      // Allow attackgang by gang name (no change)
-      result = await gwAttackGang(args[0], args[1]);
+      // Support multi-word gang names for target
+      const { db } = require('../core/database');
+      // Get attacker's gang (by user)
+      const attackerRow = await new Promise<any>((resolve) => {
+        db.get('SELECT gang_id FROM gw_players WHERE id = ?', [user.id], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (!attackerRow || !attackerRow.gang_id) return `@${user.name} You are not in a gang!`;
+      // Join all args for the target gang name
+      const targetName = args.join(' ').trim();
+      if (!targetName) return `@${user.name} Usage: ~gw attackgang <gang name>`;
+      const targetGang = await new Promise<any>((resolve) => {
+        db.get('SELECT id, name FROM gw_gangs WHERE LOWER(name) = LOWER(?)', [targetName], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (!targetGang || !targetGang.id) return `@${user.name} Gang attack failed: Gang not found`;
+      // Prevent attacking own gang
+      if (attackerRow.gang_id === targetGang.id) return `@${user.name} Cannot attack your own gang!`;
+      result = await gwAttackGang(attackerRow.gang_id, targetGang.id);
       if (result.success) {
-        if (result.winner === 'draw') return `Gang Wars: The gang battle between ${args[0]} and ${args[1]} ended in a draw!`;
-        return `Gang Wars: ${args[0]} attacked ${args[1]} and ${result.winner === args[0] ? 'won' : 'lost'}!`;
+        if (result.winner === 'draw') return `Gang Wars: The gang battle between your gang and ${targetGang.name} ended in a draw!`;
+        return `Gang Wars: Your gang attacked ${targetGang.name} and ${result.winner === attackerRow.gang_id ? 'won' : 'lost'}!`;
       } else {
         return `@${user.name} Gang attack failed: ${result.error}`;
       }
@@ -221,6 +284,23 @@ export async function handleGangWarsCommand(
       }
       result = await gwAdminGiveCurrency(args[0], Number(args[1]));
       return result.success ? `@${user.name} Gave ${args[1]} currency to ${args[0]}.` : `@${user.name} Admin give failed: ${result.error}`;
+    case 'deleteplayer': {
+      if (!isSuperMod) {
+        return `@${user.name} Command denied: Super Mod only.`;
+      }
+      const targetName = args.join(' ').trim();
+      if (!targetName) return `@${user.name} Usage: ~gw deleteplayer <username>`;
+      const { db } = require('../core/database');
+      const targetRow = await new Promise<any>((resolve) => {
+        db.get('SELECT id FROM gw_players WHERE LOWER(name) = LOWER(?)', [targetName.toLowerCase()], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (!targetRow || !targetRow.id) return `@${user.name} Delete failed: Player not found`;
+      if (targetRow.id === user.id) return `@${user.name} You cannot delete yourself!`;
+      const result = await require('./core').gwDeletePlayer(user.id, targetRow.id);
+      return result.success ? `@${user.name} Deleted player: ${targetName}` : `@${user.name} Delete failed: ${result.error}`;
+    }
     default:
       return `@${user.name} Unknown command: ${command}`;
   }

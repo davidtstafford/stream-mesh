@@ -9,6 +9,12 @@
 // inventory: JSON (array of weapon ids)
 // wins: number
 // is_supermod: boolean
+// role: string ("Grunt", "Lieutenant", "God Father")
+// Gang Join Requests Table
+// id: string (unique)
+// player_id: string
+// gang_id: string
+// timestamp: datetime
 
 // Gang Table
 // id: string (unique)

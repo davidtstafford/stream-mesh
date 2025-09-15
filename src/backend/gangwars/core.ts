@@ -1,9 +1,45 @@
+// Delete a player by ID (Super Mod only)
+// If requesterId === playerId, always allow (app owner self-delete). Otherwise, check is_supermod.
+export function gwDeletePlayer(requesterId: string, playerId: string): Promise<{ success: boolean; error?: string }> {
+  return new Promise(async (resolve) => {
+    // Always allow player deletion from the UI (IPC)
+    db.run('UPDATE gw_players SET gang_id = NULL WHERE id = ?', [playerId], () => {
+      db.run('DELETE FROM gang_join_requests WHERE player_id = ?', [playerId], () => {
+        db.all('SELECT id, disband_votes FROM gw_gangs', [], (err3: any, gangs: any[]) => {
+          if (Array.isArray(gangs)) {
+            gangs.forEach(gang => {
+              let votes: string[] = [];
+              try { votes = JSON.parse(gang.disband_votes || '[]'); } catch {}
+              if (votes.includes(playerId)) {
+                const newVotes = votes.filter((v: string) => v !== playerId);
+                db.run('UPDATE gw_gangs SET disband_votes = ? WHERE id = ?', [JSON.stringify(newVotes), gang.id]);
+              }
+            });
+          }
+          db.run('DELETE FROM gw_players WHERE id = ?', [playerId], (err2: any) => {
+            if (err2) return resolve({ success: false, error: 'DB error' });
+            resolve({ success: true });
+          });
+        });
+      });
+    });
+  });
+}
 // --- List all gangs ---
 export function gwListGangs(): Promise<GWGang[]> {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM gw_gangs', [], (err: any, rows: any[]) => {
-      if (err) reject(err);
-      else resolve(rows);
+    db.all('SELECT * FROM gw_gangs', [], async (err: any, gangs: any[]) => {
+      if (err) return reject(err);
+      // For each gang, fetch members
+      const result: GWGang[] = await Promise.all((gangs || []).map(async (gang) => {
+        return new Promise<GWGang>((res) => {
+          db.all('SELECT id FROM gw_players WHERE gang_id = ?', [gang.id], (err2: any, memberRows: any[]) => {
+            const members = Array.isArray(memberRows) ? memberRows.map(m => m.id) : [];
+            res({ ...gang, members });
+          });
+        });
+      }));
+      resolve(result);
     });
   });
 }
@@ -24,11 +60,44 @@ export function gwDeposit(playerId: string, amount: number): Promise<{ success: 
 }
 
 // --- Withdraw currency from gang bank ---
-export function gwWithdraw(playerId: string, amount: number): Promise<{ success: boolean; error?: string }> {
-  // TODO: Implement withdraw logic
-  return Promise.resolve({ success: false, error: 'Not implemented' });
+export async function gwWithdraw(playerId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  // Role-based withdraw logic
+  const player: GWPlayer = await gwGetPlayer(playerId);
+  if (!player || !player.gang_id) return { success: false, error: 'Not in a gang' };
+  const gang: GWGang = await gwGetGang(player.gang_id);
+  if (!gang) return { success: false, error: 'Gang not found' };
+  if (player.role === 'Grunt') {
+    // Grunt cannot withdraw directly
+    return { success: false, error: 'Grunts cannot withdraw. Request approval from a Lieutenant or God Father.' };
+  }
+  if (player.role === 'Lieutenant') {
+    // Lieutenant can withdraw up to 10% of bank
+    if (amount > gang.bank * 0.1) return { success: false, error: 'Lieutenant can only withdraw up to 10% of gang bank.' };
+  }
+  // God Father can withdraw any amount
+  if (amount > gang.bank) return { success: false, error: 'Insufficient gang funds' };
+  return new Promise((resolve) => {
+    db.run('UPDATE gw_gangs SET bank = bank - ? WHERE id = ?', [amount, gang.id], (err: any) => {
+      if (err) return resolve({ success: false, error: 'DB error' });
+      resolve({ success: true });
+    });
+  });
 }
+
 import { db } from '../core/database';
+
+// --- DB Migration for join requests and roles ---
+db.serialize(() => {
+  // Add role column to gw_players if not exists
+  db.run('ALTER TABLE gw_players ADD COLUMN role TEXT DEFAULT "Grunt"', (err: any) => {});
+  // Create gang_join_requests table if not exists
+  db.run(`CREATE TABLE IF NOT EXISTS gang_join_requests (
+    id TEXT PRIMARY KEY,
+    player_id TEXT,
+    gang_id TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, (err: any) => {});
+});
 import { GWWeapon, GWPlayer, GWGang } from './models';
 
 
@@ -104,6 +173,7 @@ export function gwGetGang(gangId: string): Promise<any> {
   // --- End get functions ---
 
 // --- Gang joining ---
+import { v4 as uuidv4 } from 'uuid';
 export function gwJoinGang(playerId: string, gangId: string): Promise<{ success: boolean; error?: string }> {
   return new Promise(async (resolve) => {
     const player = await gwGetPlayer(playerId);
@@ -111,12 +181,46 @@ export function gwJoinGang(playerId: string, gangId: string): Promise<{ success:
     const gang = await gwGetGang(gangId);
     if (!gang) return resolve({ success: false, error: 'Gang not found' });
     if (player.gang_id) return resolve({ success: false, error: 'Already in a gang' });
-    db.all('SELECT * FROM gw_players WHERE gang_id = ?', [gangId], (err: any, members: any[]) => {
-      if (err) return resolve({ success: false, error: 'DB error' });
-      if (members.length >= 5) return resolve({ success: false, error: 'Gang is full' });
-      db.run('UPDATE gw_players SET gang_id = ? WHERE id = ?', [gangId, playerId], (err2: any) => {
+    // Check for existing request
+    db.get('SELECT * FROM gang_join_requests WHERE player_id = ? AND gang_id = ?', [playerId, gangId], (err: any, row: any) => {
+      if (row) return resolve({ success: false, error: 'Already requested to join' });
+      // Add join request
+      db.run('INSERT INTO gang_join_requests (id, player_id, gang_id) VALUES (?, ?, ?)', [uuidv4(), playerId, gangId], (err2: any) => {
         if (err2) return resolve({ success: false, error: 'DB error' });
         resolve({ success: true });
+      });
+    });
+  });
+}
+
+// List join requests for a gang
+export function gwListJoinRequests(gangId: string): Promise<any[]> {
+  return new Promise((resolve) => {
+    db.all('SELECT * FROM gang_join_requests WHERE gang_id = ?', [gangId], (err: any, rows: any[]) => {
+      resolve(rows || []);
+    });
+  });
+}
+
+// Approve a join request (by request id)
+export function gwApproveJoinRequest(requestId: string, approverId: string): Promise<{ success: boolean; error?: string }> {
+  return new Promise(async (resolve) => {
+    // Get request
+    db.get('SELECT * FROM gang_join_requests WHERE id = ?', [requestId], async (err: any, req: any) => {
+      if (!req) return resolve({ success: false, error: 'Request not found' });
+      // Check approver's role
+      const approver = await gwGetPlayer(approverId);
+      if (!approver || !approver.gang_id || (approver.role !== 'Lieutenant' && approver.role !== 'God Father'))
+        return resolve({ success: false, error: 'Not authorized' });
+      if (approver.gang_id !== req.gang_id) return resolve({ success: false, error: 'Not your gang' });
+      // Add player to gang
+      db.run('UPDATE gw_players SET gang_id = ?, role = ? WHERE id = ?', [req.gang_id, 'Grunt', req.player_id], (err2: any) => {
+        if (err2) return resolve({ success: false, error: 'DB error' });
+        // Remove request
+        db.run('DELETE FROM gang_join_requests WHERE id = ?', [requestId], (err3: any) => {
+          if (err3) return resolve({ success: false, error: 'DB error' });
+          resolve({ success: true });
+        });
       });
     });
   });
@@ -128,9 +232,23 @@ export function gwLeaveGang(playerId: string): Promise<{ success: boolean; error
     const player = await gwGetPlayer(playerId);
     if (!player) return resolve({ success: false, error: 'Player not registered' });
     if (!player.gang_id) return resolve({ success: false, error: 'Not in a gang' });
-    db.run('UPDATE gw_players SET gang_id = NULL WHERE id = ?', [playerId], (err: any) => {
+    const gangId = player.gang_id;
+    db.run('UPDATE gw_players SET gang_id = NULL WHERE id = ?', [playerId], async (err: any) => {
       if (err) return resolve({ success: false, error: 'DB error' });
-      resolve({ success: true });
+      // Check if any members remain in the gang
+      const remaining = await new Promise<number>((res) => {
+        db.get('SELECT COUNT(*) as cnt FROM gw_players WHERE gang_id = ?', [gangId], (err2: any, row: any) => {
+          res(row ? row.cnt : 0);
+        });
+      });
+      if (remaining === 0) {
+        db.run('DELETE FROM gw_gangs WHERE id = ?', [gangId], (err3: any) => {
+          if (err3) return resolve({ success: false, error: 'DB error deleting gang' });
+          resolve({ success: true });
+        });
+      } else {
+        resolve({ success: true });
+      }
     });
   });
 }
@@ -303,10 +421,10 @@ export function gwCreateGang(playerId: string, gangName: string): Promise<void> 
       [gangId, gangName, JSON.stringify([playerId])],
       (err) => {
         if (err) return reject(err);
-        // Update player to join gang
+        // Update player to join gang and set as God Father
         db.run(
-          `UPDATE gw_players SET gang_id = ? WHERE id = ?`,
-          [gangId, playerId],
+          `UPDATE gw_players SET gang_id = ?, role = ? WHERE id = ?`,
+          [gangId, 'God Father', playerId],
           (err2) => {
             if (err2) reject(err2);
             else resolve();
@@ -316,6 +434,21 @@ export function gwCreateGang(playerId: string, gangName: string): Promise<void> 
     );
   });
 }
-
-
-
+// Kick member (God Father only)
+export async function gwKickMember(gangId: string, targetPlayerId: string, requesterId: string): Promise<{ success: boolean; error?: string }> {
+  const requester: GWPlayer = await gwGetPlayer(requesterId);
+  if (!requester || requester.gang_id !== gangId || requester.role !== 'God Father') {
+    return { success: false, error: 'Only the God Father can kick members.' };
+  }
+  // Prevent kicking self
+  if (targetPlayerId === requesterId) return { success: false, error: 'Cannot kick yourself.' };
+  // Check target is in gang
+  const target: GWPlayer = await gwGetPlayer(targetPlayerId);
+  if (!target || target.gang_id !== gangId) return { success: false, error: 'Target not in your gang.' };
+  return new Promise((resolve) => {
+    db.run('UPDATE gw_players SET gang_id = NULL, role = NULL WHERE id = ?', [targetPlayerId], (err: any) => {
+      if (err) return resolve({ success: false, error: 'DB error' });
+      resolve({ success: true });
+    });
+  });
+}
