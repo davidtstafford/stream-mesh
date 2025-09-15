@@ -420,17 +420,91 @@ function Tutorial({ currencyName }: { currencyName: string }) {
     <div style={{ background: '#181c20', borderRadius: 8, padding: 24, color: '#fff' }}>
       <h3 style={{ color: '#3a8dde' }}>How to Play Gang Wars</h3>
       <ol style={{ lineHeight: 1.7 }}>
-        <li>Register for the game: <code>~gw register</code></li>
-        <li>Create or join a gang: <code>~gw creategang &lt;name&gt;</code> or <code>~gw joingang &lt;gang&gt;</code></li>
-        <li>Earn and manage your {currencyName}: <code>~gw deposit &lt;amount&gt;</code>, <code>~gw withdraw &lt;amount&gt;</code></li>
-        <li>Buy and upgrade weapons: <code>~gw buy &lt;weapon&gt;</code>, <code>~gw upgrade &lt;weapon&gt;</code></li>
-        <li>Battle other players or gangs: <code>~gw attack &lt;player&gt;</code>, <code>~gw attackgang &lt;yourGang&gt; &lt;targetGang&gt;</code></li>
-        <li>Admins can reset the game or give {currencyName}: <code>~gw adminreset</code>, <code>~gw admingive &lt;player&gt; &lt;amount&gt;</code></li>
+        <li>Register: <code>~gw register</code></li>
+        <li>Create a gang: <code>~gw creategang &lt;name&gt;</code></li>
+        <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code> <span style={{ color:'#aaa' }}>(Sends a join request; must be approved)</span></li>
+        <li>Leave your gang: <code>~gw leavegang</code></li>
+        <li>Disband your gang: <code>~gw disbandgang</code> <span style={{ color:'#aaa' }}>(God Father only)</span></li>
+        <li>See player stats: <code>~gw stats [@username]</code> <span style={{ color:'#aaa' }}>(Shows your stats, or another player's if specified)</span></li>
+        <li>See your inventory: <code>~gw inventory</code></li>
+        <li>Quit and delete your account: <code>~gw quit</code></li>
+        <li>New players start with 100 coins and a bat.</li>
+        <li>Collect passive income: <code>~gw collect</code> <span style={{ color:'#aaa' }}>(Claim coins for all full 30-min intervals since last collection)</span></li>
       </ol>
-      <p style={{ marginTop: 16, color: '#8fda8f' }}>
-        Tip: All major events are announced in chat and via TTS overlays. Check the <b>Gang Wars Guide</b> for a full list of commands and gameplay tips!
-      </p>
-      <a href="/gangwars.html" target="_blank" rel="noopener" style={{ color: '#3a8dde', textDecoration: 'underline', fontWeight: 500 }}>Open Gang Wars Guide</a>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Gang Management & Requests</h4>
+      <ul>
+        <li>List join requests: <code>~gw listrequests</code> <span style={{ color:'#aaa' }}>(Lieutenant or God Father only)</span></li>
+        <li>Approve join request: <code>~gw approverequest &lt;requestId&gt;</code> <span style={{ color:'#aaa' }}>(Lieutenant or God Father only)</span></li>
+        <li>Kick member: <code>~gw kick &lt;username&gt;</code> <span style={{ color:'#aaa' }}>(God Father only)</span></li>
+        <li>Promote member: <code>~gw promote &lt;username&gt;</code> <span style={{ color:'#aaa' }}>(God Father only; promotes Grunt to Lieutenant, or Lieutenant to God Father and demotes self)</span></li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Currency & Banking</h4>
+      <ul>
+        <li>Deposit: <code>~gw deposit &lt;amount&gt;</code></li>
+        <li>Withdraw: <code>~gw withdraw &lt;amount&gt;</code> <span style={{ color:'#aaa' }}>(Lieutenant: up to 10% of bank, God Father: any amount, Grunt: must request approval)</span></li>
+        <li>Passive income: Use <code>~gw collect</code> to claim your coins. The default is 25 coins per 30 minutes, but the broadcaster can change this in the UI.</li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Weapons & Inventory</h4>
+      <ul>
+        <li>Buy weapon: <code>~gw buy &lt;weapon&gt;</code></li>
+        <li>Upgrade weapon: <code>~gw upgrade &lt;weapon&gt;</code></li>
+        <li>Shop: <code>~gw shop</code> <span style={{ color:'#aaa' }}>(Lists all weapons and prices)</span></li>
+        <li>Inventory is persistent and supports all weapons. You always start with a bat.</li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Combat</h4>
+      <ul>
+        <li>Attack player: <code>~gw attack &lt;player&gt;</code></li>
+        <li>Attack gang: <code>~gw attackgang &lt;gang name&gt;</code></li>
+        <li><b>Combat Rules:</b>
+          <ul>
+            <li>When attacking a player, the winner takes 10% of the loser's cash.</li>
+            <li>When attacking a gang, the winning gang takes 10% of the losing gang's bank.</li>
+            <li>If you lose, you lose 10% of your own cash/bank to the winner.</li>
+            <li>All weapons and player stats are considered in combat (not just random).</li>
+            <li>When a player or gang is attacked, they are on a 30-minute cooldown (cannot be attacked again) unless they attack someone else, which resets their cooldown.</li>
+            <li>All commands are robust to case, spaces, and @username (e.g. <code>~gw attack @EggieBert</code> or <code>~gw buy Rail Gun</code>).</li>
+            <li>All currency output uses the custom name set by the broadcaster in the UI.</li>
+          </ul>
+        </li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Leaderboards</h4>
+      <ul>
+        <li>Leaderboard: <code>~gw leaderboard</code> <span style={{ color:'#aaa' }}>(Top 3 players, top 3 gangs, your rank)</span></li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Admin & Super Mod Commands</h4>
+      <ul>
+        <li>Reset game: <code>~gw adminreset</code></li>
+        <li>Give currency: <code>~gw admingive &lt;player&gt; &lt;amount&gt;</code></li>
+        <li>Delete player: <code>~gw deleteplayer &lt;username&gt;</code> <span style={{ color:'#aaa' }}>(Super Mod only; removes a player from the game)</span></li>
+        <li>Disband gang: <code>~gw disbandgang</code> <span style={{ color:'#aaa' }}>(God Father only; also available in UI)</span></li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Gang Roles & Permissions</h4>
+      <ul>
+        <li><b>God Father</b>: Can approve join requests, kick members, withdraw any amount, disband gang.</li>
+        <li><b>Lieutenant</b>: Can approve join requests, withdraw up to 10% of gang bank.</li>
+        <li><b>Grunt</b>: Can deposit, but must request approval to withdraw. Cannot approve join requests or kick.</li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Tips & Info</h4>
+      <ul>
+        <li>Currency name and game status can be set by the broadcaster in the Games tab.</li>
+        <li>Passive income amount is also configurable in the Games tab. Default is 25 coins per 30 minutes.</li>
+        <li>Major events are announced in chat and via TTS overlays.</li>
+        <li>Check the Games tab in the Stream Mesh app for leaderboards and more info.</li>
+        <li>All user and gang lookups are robust: you can use username, @username, or ID, and gang names are case/space-insensitive.</li>
+        <li>Clear error messages are provided for all failed commands (e.g. not enough funds, not in a gang, etc).</li>
+      </ul>
+      <h4 style={{ color: '#3a8dde', marginTop: 24 }}>Example Gameplay</h4>
+      <pre style={{ background: '#222', color: '#8fda8f', borderRadius: 6, padding: 12, marginBottom: 0 }}>
+~gw register
+~gw creategang TheLegends
+~gw joingang TheLegends
+~gw deposit 100
+~gw buy pistol
+~gw attack rivalPlayer
+      </pre>
+      <div style={{ marginTop: 24 }}>
+        <a href="/gangwars.html" target="_blank" rel="noopener" style={{ color: '#3a8dde', textDecoration: 'underline', fontWeight: 500 }}>Open Full Gang Wars Guide</a>
+      </div>
     </div>
   );
 }

@@ -99,6 +99,11 @@ export async function handleGangWarsCommand(
   // Always use isSuperMod from chat event for admin permission checks
   let result;
   switch (command) {
+    case 'help':
+    case 'guide': {
+      // Output the link to the Gang Wars HTML guide
+      return `Gang Wars Guide: https://stream-mesh-website.web.app/gangwars.html (or open from the Games tab)`;
+    }
     case 'collect': {
       // Player collects passive income for all full 30-min intervals since last collection
       const result = await require('./core').gwCollectPassiveIncome(user.id);
