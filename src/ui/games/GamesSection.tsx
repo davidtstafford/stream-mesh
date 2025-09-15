@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 type Gang = { id: string; name: string; members: number; bank: number; wins: number };
 type Player = { id: string; name: string; currency: number; gang: string; wins: number; is_supermod: boolean };
