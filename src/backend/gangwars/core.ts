@@ -1,4 +1,58 @@
+import { loadGangWarsSettings } from './settings';
+// --- Utility: Resolve user by name or ID (case-insensitive, supports @, numeric/string IDs) ---
+export async function gwResolvePlayer(identifier: string): Promise<any | null> {
+  if (!identifier) return null;
+  let id = identifier;
+  if (id.startsWith('@')) id = id.slice(1);
+  const { db } = require('../core/database');
+  // Try by exact name (case-insensitive)
+  const rowByName = await new Promise<any>((resolve) => {
+    db.get('SELECT * FROM gw_players WHERE name = ? COLLATE NOCASE', [id], (err: any, row: any) => {
+      resolve(row);
+    });
+  });
+  if (rowByName && rowByName.id) return rowByName;
+  // Try by ID (numeric or string)
+  const rowById = await new Promise<any>((resolve) => {
+    db.get('SELECT * FROM gw_players WHERE id = ?', [id], (err: any, row: any) => {
+      resolve(row);
+    });
+  });
+  if (rowById && rowById.id) return rowById;
+  return null;
+}
+
+// --- Utility: Resolve gang by name or ID (case-insensitive, supports spaces) ---
+export async function gwResolveGang(identifier: string): Promise<any | null> {
+  if (!identifier) return null;
+  let id = identifier.trim();
+  const { db } = require('../core/database');
+  // Try by exact name (case-insensitive, supports spaces)
+  const rowByName = await new Promise<any>((resolve) => {
+    db.get('SELECT * FROM gw_gangs WHERE LOWER(name) = LOWER(?)', [id], (err: any, row: any) => {
+      resolve(row);
+    });
+  });
+  if (rowByName && rowByName.id) return rowByName;
+  // Try by ID (numeric or string)
+  const rowById = await new Promise<any>((resolve) => {
+    db.get('SELECT * FROM gw_gangs WHERE id = ?', [id], (err: any, row: any) => {
+      resolve(row);
+    });
+  });
+  if (rowById && rowById.id) return rowById;
+  return null;
+}
 // ...existing code...
+// Set a player's role in their gang
+export function gwSetPlayerRole(playerId: string, role: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run('UPDATE gw_players SET role = ? WHERE id = ?', [role, playerId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
 // Delete a player by ID (Super Mod only)
 // If requesterId === playerId, always allow (app owner self-delete). Otherwise, check is_supermod.
 export function gwDeletePlayer(requesterId: string, playerId: string): Promise<{ success: boolean; error?: string }> {
@@ -55,9 +109,31 @@ export function gwListPlayers(): Promise<GWPlayer[]> {
   });
 }
 // --- Deposit currency into gang bank ---
-export function gwDeposit(playerId: string, amount: number): Promise<{ success: boolean; error?: string }> {
-  // TODO: Implement deposit logic
-  return Promise.resolve({ success: false, error: 'Not implemented' });
+export async function gwDeposit(playerId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  // Validate amount
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return { success: false, error: 'Invalid amount' };
+  }
+  // Get player
+  const player: GWPlayer = await gwGetPlayer(playerId);
+  if (!player) return { success: false, error: 'Player not found' };
+  if (!player.gang_id) return { success: false, error: 'You are not in a gang' };
+  if (player.currency < amount) return { success: false, error: 'Insufficient funds' };
+  // Get gang
+  const gang: GWGang = await gwGetGang(player.gang_id);
+  if (!gang) return { success: false, error: 'Gang not found' };
+  // Perform transaction atomically
+  return new Promise((resolve) => {
+    db.serialize(() => {
+      db.run('UPDATE gw_players SET currency = currency - ? WHERE id = ?', [amount, playerId], (err1: any) => {
+        if (err1) return resolve({ success: false, error: 'DB error (player)' });
+        db.run('UPDATE gw_gangs SET bank = COALESCE(bank,0) + ? WHERE id = ?', [amount, gang.id], (err2: any) => {
+          if (err2) return resolve({ success: false, error: 'DB error (gang)' });
+          resolve({ success: true });
+        });
+      });
+    });
+  });
 }
 
 // --- Withdraw currency from gang bank ---
@@ -86,23 +162,29 @@ export async function gwWithdraw(playerId: string, amount: number): Promise<{ su
 }
 
 import { db } from '../core/database';
-// Add cooldown and inventory columns to players if not exists
-db.run('ALTER TABLE gw_players ADD COLUMN last_attacked_at INTEGER', (err: any) => {});
-db.run('ALTER TABLE gw_players ADD COLUMN last_attack_at INTEGER', (err: any) => {});
-db.run('ALTER TABLE gw_players ADD COLUMN inventory TEXT', (err: any) => {});
-
-// --- DB Migration for join requests and roles ---
+// DB migration: Add columns/tables if not exist (startup only)
+db.run('ALTER TABLE gw_players ADD COLUMN last_attacked_at INTEGER', () => {});
+db.run('ALTER TABLE gw_players ADD COLUMN last_attack_at INTEGER', () => {});
+db.run('ALTER TABLE gw_players ADD COLUMN inventory TEXT', () => {});
+db.run('ALTER TABLE gw_players ADD COLUMN role TEXT DEFAULT "Grunt"', () => {});
 db.serialize(() => {
-  // Add role column to gw_players if not exists
-  db.run('ALTER TABLE gw_players ADD COLUMN role TEXT DEFAULT "Grunt"', (err: any) => {});
-  // Create gang_join_requests table if not exists
+  db.run('ALTER TABLE gw_gangs ADD COLUMN last_attacked_at INTEGER', () => {});
+  db.run('ALTER TABLE gw_gangs ADD COLUMN last_attack_at INTEGER', () => {});
   db.run(`CREATE TABLE IF NOT EXISTS gang_join_requests (
     id TEXT PRIMARY KEY,
     player_id TEXT,
     gang_id TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`, (err: any) => {});
+  )`, () => {});
+  // Add role column to gw_players if not exists
+  db.run('ALTER TABLE gw_players ADD COLUMN role TEXT DEFAULT "Grunt"', () => {});
 });
+
+// --- Utility: Format currency with custom name ---
+export function formatCurrency(amount: number): string {
+  const { currencyName } = loadGangWarsSettings();
+  return `${amount} ${currencyName}`;
+}
 import { GWWeapon, GWPlayer, GWGang } from './models';
 // Patch: extend GWPlayer type locally to include cooldown fields if missing
 type GWPlayerWithCooldown = GWPlayer & { last_attacked_at?: number; last_attack_at?: number };
@@ -354,12 +436,12 @@ export async function gwAttackPlayer(attackerId: string, targetId: string): Prom
     const w = WEAPONS.find(w => w.id === wid);
     if (w) attackerPower += w.power * attackerInv[wid];
   }
-  attackerPower += (attacker.wins || 0) * 2;
+  // Removed win-based power bonus
   for (const wid in targetInv) {
     const w = WEAPONS.find(w => w.id === wid);
     if (w) targetPower += w.power * targetInv[wid];
   }
-  targetPower += (target.wins || 0) * 2;
+  // Removed win-based power bonus
   // Add some randomness
   attackerPower += Math.floor(Math.random() * 10);
   targetPower += Math.floor(Math.random() * 10);
@@ -390,11 +472,24 @@ export async function gwAttackPlayer(attackerId: string, targetId: string): Prom
   return { success: true, winner, amount };
 }
 
-export async function gwAttackGang(attackerGangId: string, targetGangId: string): Promise<{ success: boolean; error?: string; winner?: string }> {
+export interface GwAttackGangResult {
+  success: boolean;
+  error?: string;
+  winner?: string;
+  amount?: number;
+}
+export async function gwAttackGang(attackerGangId: string, targetGangId: string): Promise<GwAttackGangResult> {
   const attackerGang = await gwGetGang(attackerGangId);
   const targetGang = await gwGetGang(targetGangId);
   if (!attackerGang || !targetGang) return { success: false, error: 'Gang not found' };
   if (attackerGangId === targetGangId) return { success: false, error: 'Cannot attack self' };
+  // --- Gang cooldown logic ---
+  const now = Date.now();
+  const targetLastAttacked = typeof targetGang.last_attacked_at === 'number' ? targetGang.last_attacked_at : 0;
+  const targetLastAttack = typeof targetGang.last_attack_at === 'number' ? targetGang.last_attack_at : 0;
+  if (targetLastAttacked && targetLastAttacked > targetLastAttack && now - targetLastAttacked < 30 * 60 * 1000) {
+    return { success: false, error: 'Target gang is on cooldown (recently attacked)' };
+  }
   // Get members
   const getMembers = (gang: GWGang) => Array.isArray(gang.members) ? gang.members : JSON.parse(gang.members as any as string);
   const attackerMembers: string[] = getMembers(attackerGang);
@@ -409,7 +504,6 @@ export async function gwAttackGang(attackerGangId: string, targetGangId: string)
       const w = WEAPONS.find(w => w.id === wid);
       if (w) attackerPower += w.power * inv[wid];
     }
-    attackerPower += (p.wins || 0) * 2;
   }
   for (const pid of targetMembers) {
     const p: any = await gwGetPlayer(pid);
@@ -419,7 +513,6 @@ export async function gwAttackGang(attackerGangId: string, targetGangId: string)
       const w = WEAPONS.find(w => w.id === wid);
       if (w) targetPower += w.power * inv[wid];
     }
-    targetPower += (p.wins || 0) * 2;
   }
   // Add randomness
   attackerPower += Math.floor(Math.random() * 20);
@@ -435,7 +528,9 @@ export async function gwAttackGang(attackerGangId: string, targetGangId: string)
   }
   // Calculate bank transfer (10% of losing gang's bank)
   if (winType === 'draw') {
-    return { success: true, winner: 'draw' };
+    // Update cooldowns for both
+    await new Promise(res => db.run('UPDATE gw_gangs SET last_attacked_at = ?, last_attack_at = ? WHERE id IN (?, ?)', [now, now, attackerGangId, targetGangId], res));
+    return { success: true, winner: 'draw', amount: 0 };
   }
   if (!winner || !loser) return { success: false, error: 'Unknown error' };
   const loserGang = (loser === attackerGangId) ? attackerGang : targetGang;
@@ -443,7 +538,10 @@ export async function gwAttackGang(attackerGangId: string, targetGangId: string)
   const amount = Math.floor((loserGang.bank || 0) * percent);
   await new Promise(res => db.run('UPDATE gw_gangs SET bank = bank - ? WHERE id = ?', [amount, loser], res));
   await new Promise(res => db.run('UPDATE gw_gangs SET bank = bank + ?, wins = wins + 1 WHERE id = ?', [amount, winner], res));
-  return { success: true, winner };
+  // Update cooldowns
+  await new Promise(res => db.run('UPDATE gw_gangs SET last_attacked_at = ? WHERE id = ?', [now, loser], res));
+  await new Promise(res => db.run('UPDATE gw_gangs SET last_attack_at = ? WHERE id = ?', [now, winner], res));
+  return { success: true, winner, amount };
 }
 
 // --- Admin tools (stubs) ---

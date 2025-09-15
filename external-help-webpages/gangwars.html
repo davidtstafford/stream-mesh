@@ -25,14 +25,18 @@
       <li>Create a gang: <code>~gw creategang &lt;name&gt;</code></li>
       <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code> <span style="color:#aaa">(Sends a join request; must be approved)</span></li>
       <li>Leave your gang: <code>~gw leavegang</code></li>
+  <li>Disband your gang: <code>~gw disbandgang</code> <span style="color:#aaa">(God Father only)</span></li>
+  <li>See your stats: <code>~gw stats</code></li>
+  <li>See your inventory: <code>~gw inventory</code></li>
   <li>Quit and delete your account: <code>~gw quit</code></li>
-  <li>New players start with 100 coins.</li>
+  <li>New players start with 100 coins and a bat.</li>
     </ul>
     <h2>Gang Management & Requests</h2>
     <ul>
       <li>List join requests: <code>~gw listrequests</code> <span style="color:#aaa">(Lieutenant or God Father only)</span></li>
       <li>Approve join request: <code>~gw approverequest &lt;requestId&gt;</code> <span style="color:#aaa">(Lieutenant or God Father only)</span></li>
       <li>Kick member: <code>~gw kick &lt;username&gt;</code> <span style="color:#aaa">(God Father only)</span></li>
+  <li>Promote member: <code>~gw promote &lt;username&gt;</code> <span style="color:#aaa">(God Father only; promotes Grunt to Lieutenant, or Lieutenant to God Father and demotes self)</span></li>
     </ul>
     <h2>Currency & Banking</h2>
     <ul>
@@ -44,20 +48,21 @@
       <li>Buy weapon: <code>~gw buy &lt;weapon&gt;</code></li>
       <li>Upgrade weapon: <code>~gw upgrade &lt;weapon&gt;</code></li>
   <li>Shop: <code>~gw shop</code> <span style="color:#aaa">(Lists all weapons and prices)</span></li>
-  <li>See your stats: <code>~gw stats</code> <span style="color:#aaa">(Shows your coins, wins, and gang)</span></li>
-  <li>See your inventory: <code>~gw inventory</code> <span style="color:#aaa">(Lists all weapons you own)</span></li>
+  <li>Inventory is persistent and supports all weapons. You always start with a bat.</li>
     </ul>
     <h2>Combat</h2>
     <ul>
       <li>Attack player: <code>~gw attack &lt;player&gt;</code></li>
-      <li>Attack gang: <code>~gw attackgang &lt;yourGang&gt; &lt;targetGang&gt;</code></li>
+    <li>Attack gang: <code>~gw attackgang &lt;gang name&gt;</code></li>
       <li><b>Combat Rules:</b>
         <ul>
           <li>When attacking a player, the winner takes 10% of the loser's cash.</li>
           <li>When attacking a gang, the winning gang takes 10% of the losing gang's bank.</li>
           <li>If you lose, you lose 10% of your own cash/bank to the winner.</li>
           <li>All weapons and player stats are considered in combat (not just random).</li>
-          <li>When a player is attacked, they are on a 30-minute cooldown (cannot be attacked again) unless they attack someone else, which resets their cooldown.</li>
+      <li>When a player or gang is attacked, they are on a 30-minute cooldown (cannot be attacked again) unless they attack someone else, which resets their cooldown.</li>
+      <li>All commands are robust to case, spaces, and @username (e.g. <code>~gw attack @EggieBert</code> or <code>~gw buy Rail Gun</code>).</li>
+      <li>All currency output uses the custom name set by the broadcaster in the UI.</li>
         </ul>
       </li>
     </ul>
@@ -70,6 +75,7 @@
       <li>Reset game: <code>~gw adminreset</code></li>
       <li>Give currency: <code>~gw admingive &lt;player&gt; &lt;amount&gt;</code></li>
       <li>Delete player: <code>~gw deleteplayer &lt;username&gt;</code> <span style="color:#aaa">(Super Mod only; removes a player from the game)</span></li>
+  <li>Disband gang: <code>~gw disbandgang</code> <span style="color:#aaa">(God Father only; also available in UI)</span></li>
     </ul>
     <h2>Super Mod Features</h2>
     <ul>
@@ -89,6 +95,8 @@
       <li>Currency name and game status can be set by the broadcaster in the Games tab.</li>
       <li>Major events are announced in chat and via TTS overlays.</li>
       <li>Check the Games tab in the Stream Mesh app for leaderboards and more info.</li>
+  <li>All user and gang lookups are robust: you can use username, @username, or ID, and gang names are case/space-insensitive.</li>
+  <li>Clear error messages are provided for all failed commands (e.g. not enough funds, not in a gang, etc).</li>
     </ul>
     <h2>Example Gameplay</h2>
     <pre>
@@ -106,21 +114,21 @@
         <tr style="color:#3a8dde;"><th>Name</th><th>Price</th><th>Power</th><th>Upgrade Cost</th><th>Max Level</th></tr>
       </thead>
       <tbody>
-  <tr><td>Pistol</td><td>$100</td><td>10</td><td>$50</td><td>3</td></tr>
-  <tr><td>Shotgun</td><td>$300</td><td>25</td><td>$150</td><td>3</td></tr>
-  <tr><td>Rifle</td><td>$600</td><td>50</td><td>$300</td><td>3</td></tr>
-  <tr><td>SMG</td><td>$1,200</td><td>80</td><td>$600</td><td>4</td></tr>
-  <tr><td>Sniper Rifle</td><td>$3,000</td><td>150</td><td>$1,200</td><td>4</td></tr>
-  <tr><td>Light Machine Gun</td><td>$7,000</td><td>300</td><td>$2,500</td><td>4</td></tr>
-  <tr><td>Rocket Launcher</td><td>$20,000</td><td>800</td><td>$6,000</td><td>5</td></tr>
-  <tr><td>Flamethrower</td><td>$50,000</td><td>1,500</td><td>$15,000</td><td>5</td></tr>
-  <tr><td>Minigun</td><td>$150,000</td><td>4,000</td><td>$40,000</td><td>5</td></tr>
-  <tr><td>Railgun</td><td>$500,000</td><td>12,000</td><td>$120,000</td><td>6</td></tr>
-  <tr><td>Plasma Cannon</td><td>$2,000,000</td><td>40,000</td><td>$400,000</td><td>6</td></tr>
-  <tr><td>Orbital Strike</td><td>$10,000,000</td><td>200,000</td><td>$2,000,000</td><td>7</td></tr>
-  <tr><td>Black Hole Generator</td><td>$50,000,000</td><td>1,000,000</td><td>$10,000,000</td><td>7</td></tr>
-  <tr><td>Nanobot Swarm</td><td>$200,000,000</td><td>5,000,000</td><td>$40,000,000</td><td>8</td></tr>
-  <tr><td>Antimatter Bomb</td><td>$1,000,000,000</td><td>20,000,000</td><td>$200,000,000</td><td>8</td></tr>
+        <tr><td>Pistol</td><td>$100</td><td>10</td><td>$50</td><td>3</td></tr>
+        <tr><td>Shotgun</td><td>$300</td><td>25</td><td>$150</td><td>3</td></tr>
+        <tr><td>Rifle</td><td>$600</td><td>50</td><td>$300</td><td>3</td></tr>
+        <tr><td>SMG</td><td>$1,200</td><td>80</td><td>$600</td><td>4</td></tr>
+        <tr><td>Sniper Rifle</td><td>$3,000</td><td>150</td><td>$1,200</td><td>4</td></tr>
+        <tr><td>Light Machine Gun</td><td>$7,000</td><td>300</td><td>$2,500</td><td>4</td></tr>
+        <tr><td>Rocket Launcher</td><td>$20,000</td><td>800</td><td>$6,000</td><td>5</td></tr>
+        <tr><td>Flamethrower</td><td>$50,000</td><td>1,500</td><td>$15,000</td><td>5</td></tr>
+        <tr><td>Minigun</td><td>$150,000</td><td>4,000</td><td>$40,000</td><td>5</td></tr>
+        <tr><td>Railgun</td><td>$500,000</td><td>12,000</td><td>$120,000</td><td>6</td></tr>
+        <tr><td>Plasma Cannon</td><td>$2,000,000</td><td>40,000</td><td>$400,000</td><td>6</td></tr>
+        <tr><td>Orbital Strike</td><td>$10,000,000</td><td>200,000</td><td>$2,000,000</td><td>7</td></tr>
+        <tr><td>Black Hole Generator</td><td>$50,000,000</td><td>1,000,000</td><td>$10,000,000</td><td>7</td></tr>
+        <tr><td>Nanobot Swarm</td><td>$200,000,000</td><td>5,000,000</td><td>$40,000,000</td><td>8</td></tr>
+        <tr><td>Antimatter Bomb</td><td>$1,000,000,000</td><td>20,000,000</td><td>$200,000,000</td><td>8</td></tr>
       </tbody>
     </table>
   </div>
