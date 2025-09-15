@@ -89,107 +89,140 @@ export async function handleGangWarsCommand(
 ) {
   let result;
   switch (command) {
+    case 'leaderboard': {
+      // Top 3 players by wins, top 3 gangs by wins, user's player/gang rank
+      const { db } = require('../core/database');
+      // Top 3 players
+      const topPlayers = await new Promise<any[]>((resolve) => {
+        db.all('SELECT name, wins FROM gw_players ORDER BY wins DESC, name ASC LIMIT 3', [], (err: any, rows: any[]) => {
+          resolve(rows || []);
+        });
+      });
+      // Top 3 gangs
+      const topGangs = await new Promise<any[]>((resolve) => {
+        db.all('SELECT name, wins FROM gw_gangs ORDER BY wins DESC, name ASC LIMIT 3', [], (err: any, rows: any[]) => {
+          resolve(rows || []);
+        });
+      });
+      // User's player rank
+      const playerRanks = await new Promise<any[]>((resolve) => {
+        db.all('SELECT id, name, wins FROM gw_players ORDER BY wins DESC, name ASC', [], (err: any, rows: any[]) => {
+          resolve(rows || []);
+        });
+      });
+      const playerRank = playerRanks.findIndex(p => p.id === user.id) + 1;
+      // User's gang rank (if in a gang)
+      let gangRank = null;
+      let userGangName = null;
+      const userRow = playerRanks.find(p => p.id === user.id);
+      if (userRow && userRow.gang_id) {
+        const gangRanks = await new Promise<any[]>((resolve) => {
+          db.all('SELECT id, name, wins FROM gw_gangs ORDER BY wins DESC, name ASC', [], (err: any, rows: any[]) => {
+            resolve(rows || []);
+          });
+        });
+        const userGang = await new Promise<any>((resolve) => {
+          db.get('SELECT id, name FROM gw_gangs WHERE id = ?', [userRow.gang_id], (err: any, row: any) => {
+            resolve(row);
+          });
+        });
+        userGangName = userGang?.name;
+        if (userGang) {
+          gangRank = gangRanks.findIndex(g => g.id === userGang.id) + 1;
+        }
+      }
+      // Format output
+      let msg = `Top 3 Players: ` + topPlayers.map((p, i) => `${i+1}. ${p.name} (${p.wins} wins)`).join(' | ');
+      msg += ` | Top 3 Gangs: ` + topGangs.map((g, i) => `${i+1}. ${g.name} (${g.wins} wins)`).join(' | ');
+      msg += ` | Your Player Rank: ${playerRank > 0 ? playerRank : 'N/A'}`;
+      if (userGangName && gangRank) msg += ` | Your Gang (${userGangName}) Rank: ${gangRank}`;
+      return msg;
+    }
+    case 'shop': {
+      // List all weapons and their prices
+  const { WEAPONS } = require('./core');
+  const weaponList = WEAPONS.map((w: import('./models').GWWeapon) => `${w.name}: $${w.cost} (Power: ${w.power}, Upgrade: $${w.upgrade_cost}, Max Lv: ${w.max_level})`).join(' | ');
+  return `Gang Wars Shop: ${weaponList}`;
+    }
     case 'register':
       await gwRegisterPlayer(user.id, user.name, isSuperMod);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: `Registered for Gang Wars!`, time: new Date().toISOString() });
-      break;
+      return `@${user.name} Registered for Gang Wars!`;
     case 'creategang':
       try {
         await gwCreateGang(user.id, args[0]);
-        const msg = `Gang created: ${args[0]}`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        return `@${user.name} Gang created: ${args[0]}`;
       } catch (err: any) {
-        const msg = `Gang creation failed: ${err?.message || err}`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        return `@${user.name} Gang creation failed: ${err?.message || err}`;
       }
-      break;
     case 'joingang':
       result = await gwJoinGang(user.id, args[0]);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Joined gang!` : `Join failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Joined gang!` : `@${user.name} Join failed: ${result.error}`;
     case 'leavegang':
       result = await gwLeaveGang(user.id);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Left gang.` : `Leave failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Left gang.` : `@${user.name} Leave failed: ${result.error}`;
     case 'disbandgang':
       result = await gwDisbandGang(args[0]);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Gang disbanded.` : `Disband failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Gang disbanded.` : `@${user.name} Disband failed: ${result.error}`;
     case 'deposit':
       result = await gwDeposit(user.id, Number(args[0]));
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Deposited ${args[0]}` : `Deposit failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Deposited ${args[0]}` : `@${user.name} Deposit failed: ${result.error}`;
     case 'withdraw':
       result = await gwWithdraw(user.id, Number(args[0]));
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Withdrew ${args[0]}` : `Withdraw failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Withdrew ${args[0]}` : `@${user.name} Withdraw failed: ${result.error}`;
     case 'buy':
       result = await gwBuyWeapon(user.id, args[0]);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Bought weapon: ${args[0]}` : `Buy failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Bought weapon: ${args[0]}` : `@${user.name} Buy failed: ${result.error}`;
     case 'upgrade':
       result = await gwUpgradeWeapon(user.id, args[0]);
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Upgraded weapon: ${args[0]}` : `Upgrade failed: ${result.error}`, time: new Date().toISOString() });
-      break;
-    case 'attack':
-      result = await gwAttackPlayer(user.id, args[0]);
+      return result.success ? `@${user.name} Upgraded weapon: ${args[0]}` : `@${user.name} Upgrade failed: ${result.error}`;
+    case 'attack': {
+      // Allow attack by @username or username
+      let targetArg = args[0];
+      if (!targetArg) return `@${user.name} Usage: ~gw attack <username>`;
+      if (targetArg.startsWith('@')) targetArg = targetArg.slice(1);
+      // Try to resolve targetId by username
+      const { db } = require('../core/database');
+      const targetRow = await new Promise<any>((resolve) => {
+        db.get('SELECT id FROM gw_players WHERE LOWER(name) = LOWER(?)', [targetArg], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (!targetRow || !targetRow.id) return `@${user.name} Attack failed: Player not found`;
+      result = await gwAttackPlayer(user.id, targetRow.id);
       if (result.success) {
-        const msg = result.winner === 'draw'
-          ? `Gang Wars: The battle between ${user.name} and ${args[0]} ended in a draw!`
-          : `Gang Wars: ${user.name} attacked ${args[0]} and ${result.winner === user.id ? 'won' : 'lost'}!`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        if (result.winner === 'draw') return `Gang Wars: The battle between ${user.name} and ${targetArg} ended in a draw!`;
+        return `Gang Wars: ${user.name} attacked ${targetArg} and ${result.winner === user.id ? 'won' : 'lost'}!`;
       } else {
-        const msg = `Attack failed: ${result.error}`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        return `@${user.name} Attack failed: ${result.error}`;
       }
-      break;
-    case 'attackgang':
+    }
+    case 'attackgang': {
+      // Allow attackgang by gang name (no change)
       result = await gwAttackGang(args[0], args[1]);
       if (result.success) {
-        const msg = result.winner === 'draw'
-          ? `Gang Wars: The gang battle between ${args[0]} and ${args[1]} ended in a draw!`
-          : `Gang Wars: ${args[0]} attacked ${args[1]} and ${result.winner === args[0] ? 'won' : 'lost'}!`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        if (result.winner === 'draw') return `Gang Wars: The gang battle between ${args[0]} and ${args[1]} ended in a draw!`;
+        return `Gang Wars: ${args[0]} attacked ${args[1]} and ${result.winner === args[0] ? 'won' : 'lost'}!`;
       } else {
-        const msg = `Gang attack failed: ${result.error}`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
+        return `@${user.name} Gang attack failed: ${result.error}`;
       }
-      break;
+    }
     case 'adminreset':
       if (!isSuperMod) {
-        const msg = `Admin command denied: Super Mod only.`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
-        break;
+        return `@${user.name} Admin command denied: Super Mod only.`;
       }
       result = await gwAdminReset();
-      {
-        const msg = result.success ? `Gang Wars: The game has been reset by admin!` : `Reset failed.`;
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: msg, time: new Date().toISOString() });
-        ttsQueue.enqueue({ text: msg });
-      }
-      break;
+      return result.success ? `Gang Wars: The game has been reset by admin!` : `@${user.name} Reset failed.`;
     case 'admingive':
       if (!isSuperMod) {
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: `Admin command denied: Super Mod only.`, time: new Date().toISOString() });
-        break;
+        return `@${user.name} Admin command denied: Super Mod only.`;
       }
       if (!args[0] || isNaN(Number(args[1]))) {
-        chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: `Usage: ~gw admingive <playerId> <amount>`, time: new Date().toISOString() });
-        break;
+        return `@${user.name} Usage: ~gw admingive <playerId> <amount>`;
       }
       result = await gwAdminGiveCurrency(args[0], Number(args[1]));
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: result.success ? `Gave ${args[1]} currency to ${args[0]}.` : `Admin give failed: ${result.error}`, time: new Date().toISOString() });
-      break;
+      return result.success ? `@${user.name} Gave ${args[1]} currency to ${args[0]}.` : `@${user.name} Admin give failed: ${result.error}`;
     default:
-      chatBus.emitChatMessage({ platform: 'app', channel: '', user: user.name, message: `Unknown command: ${command}`, time: new Date().toISOString() });
-      break;
+      return `@${user.name} Unknown command: ${command}`;
   }
 }
 

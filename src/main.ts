@@ -1,3 +1,4 @@
+
 // Main Electron process
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
@@ -12,9 +13,30 @@ import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/serv
 import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 import { commandProcessor } from './backend/services/commandProcessor';
-
-// --- Gang Wars IPC handlers ---
+import { loadGangWarsSettings, saveGangWarsSettings, GangWarsSettings } from './backend/gangwars/settings';
 import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang } from './backend/gangwars/core';
+
+// ...existing code...
+
+ipcMain.handle('gangwars:getSettings', async () => {
+  try {
+    const settings = loadGangWarsSettings();
+    return { success: true, settings };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:setSettings', async (_event, settings: GangWarsSettings) => {
+  try {
+    saveGangWarsSettings(settings);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+// Main Electron process
+// ...existing code...
 
 ipcMain.handle('gangwars:listGangs', async () => {
   try {

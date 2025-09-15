@@ -38,12 +38,92 @@ export function GamesSection() {
 
 // --- Gang Wars Section with sub-tabs ---
 function GangWarsTabs() {
+  // Chat command feedback state
+  const [commandStatus, setCommandStatus] = useState<string | null>(null);
+  const [commandInput, setCommandInput] = useState('');
+  const [commandLoading, setCommandLoading] = useState(false);
+
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'gangs' | 'players'>('overview');
   const [gameEnabled, setGameEnabled] = useState(true);
   const [currencyName, setCurrencyName] = useState('Coins');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // Load settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const result = await window.electron.ipcRenderer.invoke('gangwars:getSettings');
+        if (result && result.success) {
+          setCurrencyName(result.settings.currencyName || 'Coins');
+          setGameEnabled(typeof result.settings.gameEnabled === 'boolean' ? result.settings.gameEnabled : true);
+          setSettingsLoaded(true);
+        } else {
+          setSettingsError(result && result.error ? result.error : 'Failed to load settings');
+        }
+      } catch (e) {
+        setSettingsError('Failed to load settings');
+      }
+    }
+    loadSettings();
+  }, []);
+
+  // Save settings when changed
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    const save = async () => {
+      try {
+        await window.electron.ipcRenderer.invoke('gangwars:setSettings', {
+          currencyName,
+          gameEnabled,
+        });
+      } catch {}
+    };
+    save();
+  }, [currencyName, gameEnabled, settingsLoaded]);
+
+  // Send chat command via IPC (assumes a handler exists, or just simulate feedback)
+  async function sendChatCommand(cmd: string) {
+    setCommandLoading(true);
+    setCommandStatus(null);
+    try {
+      const result = await window.electron.ipcRenderer.invoke('gangwars:sendChatCommand', cmd);
+      if (result && result.success) {
+        setCommandStatus(`Command sent: ${cmd}`);
+      } else {
+        setCommandStatus(result && result.error ? result.error : 'Failed to send command');
+      }
+    } catch (e) {
+      setCommandStatus('Failed to send command');
+    } finally {
+      setCommandLoading(false);
+    }
+  }
 
   return (
     <div style={{ background: '#23272e', borderRadius: 12, padding: 32, maxWidth: 900, margin: '0 auto' }}>
+      {/* Notification area for chat command feedback */}
+      {commandStatus && (
+        <div style={{ background: '#23272e', color: '#8fda8f', border: '1px solid #3a8dde', borderRadius: 6, padding: 10, marginBottom: 16 }}>
+          {commandStatus}
+        </div>
+      )}
+      {/* Simple chat command input */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <input
+          type="text"
+          value={commandInput}
+          onChange={e => setCommandInput(e.target.value)}
+          placeholder="Type chat command (e.g. ~gw register)"
+          style={{ flex: 1, padding: '6px 12px', borderRadius: 4, border: '1px solid #444', background: '#181c20', color: '#fff' }}
+          disabled={commandLoading}
+        />
+        <button
+          onClick={() => { if (commandInput.trim()) { sendChatCommand(commandInput.trim()); setCommandInput(''); } }}
+          style={{ padding: '6px 18px', borderRadius: 4, background: '#3a8dde', color: '#fff', border: 'none', fontWeight: 600, fontSize: 15, cursor: commandLoading ? 'not-allowed' : 'pointer', opacity: commandLoading ? 0.6 : 1 }}
+          disabled={commandLoading || !commandInput.trim()}
+        >Send</button>
+      </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <button
           onClick={() => setActiveSubTab('overview')}
@@ -58,6 +138,7 @@ function GangWarsTabs() {
           style={subTabBtnStyle(activeSubTab === 'players')}
         >Players</button>
       </div>
+      {settingsError && <div style={{ color: '#dc3545', marginBottom: 12 }}>{settingsError}</div>}
       {activeSubTab === 'overview' && (
         <>
           <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 24 }}>
@@ -116,9 +197,15 @@ function GangsTab() {
     setError(null);
     try {
       const result = await window.electron.ipcRenderer.invoke('gangwars:listGangs');
-      setGangs(result);
+      if (result && result.success) {
+        setGangs(result.gangs || []);
+      } else {
+        setError(result && result.error ? result.error : 'Failed to load gangs');
+        setGangs([]);
+      }
     } catch (e) {
       setError('Failed to load gangs');
+      setGangs([]);
     } finally {
       setLoading(false);
     }
@@ -228,9 +315,15 @@ function PlayersTab() {
     setError(null);
     try {
       const result = await window.electron.ipcRenderer.invoke('gangwars:listPlayers');
-      setPlayers(result);
+      if (result && result.success) {
+        setPlayers(result.players || []);
+      } else {
+        setError(result && result.error ? result.error : 'Failed to load players');
+        setPlayers([]);
+      }
     } catch (e) {
       setError('Failed to load players');
+      setPlayers([]);
     } finally {
       setLoading(false);
     }

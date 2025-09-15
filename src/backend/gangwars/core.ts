@@ -33,10 +33,22 @@ import { GWWeapon, GWPlayer, GWGang } from './models';
 
 
 // Example weapon list (should be loaded from DB or config in production)
-const WEAPONS: GWWeapon[] = [
+export const WEAPONS: GWWeapon[] = [
   { id: 'pistol', name: 'Pistol', cost: 100, power: 10, upgrade_cost: 50, max_level: 3 },
   { id: 'shotgun', name: 'Shotgun', cost: 300, power: 25, upgrade_cost: 150, max_level: 3 },
-  { id: 'rifle', name: 'Rifle', cost: 600, power: 50, upgrade_cost: 300, max_level: 3 }
+  { id: 'rifle', name: 'Rifle', cost: 600, power: 50, upgrade_cost: 300, max_level: 3 },
+  { id: 'smg', name: 'SMG', cost: 1200, power: 80, upgrade_cost: 600, max_level: 4 },
+  { id: 'sniper', name: 'Sniper Rifle', cost: 3000, power: 150, upgrade_cost: 1200, max_level: 4 },
+  { id: 'lmg', name: 'Light Machine Gun', cost: 7000, power: 300, upgrade_cost: 2500, max_level: 4 },
+  { id: 'rocket', name: 'Rocket Launcher', cost: 20000, power: 800, upgrade_cost: 6000, max_level: 5 },
+  { id: 'flamethrower', name: 'Flamethrower', cost: 50000, power: 1500, upgrade_cost: 15000, max_level: 5 },
+  { id: 'minigun', name: 'Minigun', cost: 150000, power: 4000, upgrade_cost: 40000, max_level: 5 },
+  { id: 'railgun', name: 'Railgun', cost: 500000, power: 12000, upgrade_cost: 120000, max_level: 6 },
+  { id: 'plasmacannon', name: 'Plasma Cannon', cost: 2000000, power: 40000, upgrade_cost: 400000, max_level: 6 },
+  { id: 'orbital', name: 'Orbital Strike', cost: 10000000, power: 200000, upgrade_cost: 2000000, max_level: 7 },
+  { id: 'blackhole', name: 'Black Hole Generator', cost: 50000000, power: 1000000, upgrade_cost: 10000000, max_level: 7 },
+  { id: 'nanobot', name: 'Nanobot Swarm', cost: 200000000, power: 5000000, upgrade_cost: 40000000, max_level: 8 },
+  { id: 'antimatter', name: 'Antimatter Bomb', cost: 1000000000, power: 20000000, upgrade_cost: 200000000, max_level: 8 }
 ];
 
 function getInventoryObj(player: GWPlayer): Record<string, number> {
