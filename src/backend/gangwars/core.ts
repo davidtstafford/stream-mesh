@@ -1,3 +1,4 @@
+// ...existing code...
 // Delete a player by ID (Super Mod only)
 // If requesterId === playerId, always allow (app owner self-delete). Otherwise, check is_supermod.
 export function gwDeletePlayer(requesterId: string, playerId: string): Promise<{ success: boolean; error?: string }> {
@@ -85,6 +86,9 @@ export async function gwWithdraw(playerId: string, amount: number): Promise<{ su
 }
 
 import { db } from '../core/database';
+// Add cooldown column to players if not exists
+db.run('ALTER TABLE gw_players ADD COLUMN last_attacked_at INTEGER', (err: any) => {});
+db.run('ALTER TABLE gw_players ADD COLUMN last_attack_at INTEGER', (err: any) => {});
 
 // --- DB Migration for join requests and roles ---
 db.serialize(() => {
@@ -99,6 +103,8 @@ db.serialize(() => {
   )`, (err: any) => {});
 });
 import { GWWeapon, GWPlayer, GWGang } from './models';
+// Patch: extend GWPlayer type locally to include cooldown fields if missing
+type GWPlayerWithCooldown = GWPlayer & { last_attacked_at?: number; last_attack_at?: number };
 
 
 // Example weapon list (should be loaded from DB or config in production)
@@ -141,7 +147,21 @@ export async function gwBuyWeapon(playerId: string, weaponId: string): Promise<{
   const weapon = WEAPONS.find(w => w.id === weaponId);
   if (!weapon) return { success: false, error: 'Weapon not found' };
   if (player.currency < weapon.cost) return { success: false, error: 'Insufficient funds' };
-  let inventory = getInventoryObj(player);
+  // Migrate legacy array inventory to object
+  let inventory: Record<string, number> = {};
+  try {
+    if (typeof player.inventory === 'string') {
+      inventory = JSON.parse(player.inventory);
+    } else if (Array.isArray(player.inventory)) {
+      for (const wid of player.inventory) inventory[wid] = 1;
+    } else if (typeof player.inventory === 'object') {
+      inventory = player.inventory as any;
+    }
+  } catch { inventory = {}; }
+  // Save migrated inventory if it was an array
+  if (Array.isArray(player.inventory)) {
+    await new Promise(res => db.run('UPDATE gw_players SET inventory = ? WHERE id = ?', [JSON.stringify(inventory), playerId], res));
+  }
   if (inventory[weaponId]) return { success: false, error: 'Already owned' };
   inventory[weaponId] = 1;
   // Update player inventory and currency
@@ -290,11 +310,18 @@ export async function gwUpgradeWeapon(playerId: string, weaponId: string): Promi
 
 // --- Combat logic (stubs) ---
 export async function gwAttackPlayer(attackerId: string, targetId: string): Promise<{ success: boolean; error?: string; winner?: string }> {
-  const attacker: GWPlayer = await gwGetPlayer(attackerId);
-  const target: GWPlayer = await gwGetPlayer(targetId);
+  const attacker = await gwGetPlayer(attackerId) as any;
+  const target = await gwGetPlayer(targetId) as any;
   if (!attacker || !target) return { success: false, error: 'Player not found' };
   if (attackerId === targetId) return { success: false, error: 'Cannot attack self' };
-  // Calculate power
+  // Cooldown check: target can't be attacked if attacked in last 30 min unless they attacked someone else since
+  const now = Date.now();
+  const targetLastAttacked = typeof target.last_attacked_at === 'number' ? target.last_attacked_at : 0;
+  const targetLastAttack = typeof target.last_attack_at === 'number' ? target.last_attack_at : 0;
+  if (targetLastAttacked && targetLastAttacked > targetLastAttack && now - targetLastAttacked < 30 * 60 * 1000) {
+    return { success: false, error: 'Target is on cooldown (recently attacked)' };
+  }
+  // Calculate power: all weapons and stats
   const attackerInv = getInventoryObj(attacker);
   const targetInv = getInventoryObj(target);
   let attackerPower = 0, targetPower = 0;
@@ -302,69 +329,96 @@ export async function gwAttackPlayer(attackerId: string, targetId: string): Prom
     const w = WEAPONS.find(w => w.id === wid);
     if (w) attackerPower += w.power * attackerInv[wid];
   }
+  attackerPower += (attacker.wins || 0) * 2;
   for (const wid in targetInv) {
     const w = WEAPONS.find(w => w.id === wid);
     if (w) targetPower += w.power * targetInv[wid];
   }
+  targetPower += (target.wins || 0) * 2;
   // Add some randomness
   attackerPower += Math.floor(Math.random() * 10);
   targetPower += Math.floor(Math.random() * 10);
-  let winner: string, loser: string;
-  if (attackerPower === targetPower) return { success: true, winner: 'draw' };
-  if (attackerPower > targetPower) { winner = attackerId; loser = targetId; }
-  else { winner = targetId; loser = attackerId; }
-  // Award winner, update stats
-  return new Promise((resolve) => {
-    db.run('UPDATE gw_players SET wins = wins + 1, currency = currency + 50 WHERE id = ?', [winner], (err: any) => {
-      if (err) return resolve({ success: false, error: 'DB error' });
-      resolve({ success: true, winner });
-    });
-  });
+  let winner: string | undefined = undefined, loser: string | undefined = undefined;
+  let winType: 'attacker' | 'target' | 'draw';
+  if (attackerPower === targetPower) {
+    winType = 'draw';
+  } else if (attackerPower > targetPower) {
+    winner = attackerId; loser = targetId; winType = 'attacker';
+  } else {
+    winner = targetId; loser = attackerId; winType = 'target';
+  }
+  // Calculate cash transfer (10% of loser's cash)
+  if (winType === 'draw') {
+    // Update cooldowns for both
+    await new Promise(res => db.run('UPDATE gw_players SET last_attacked_at = ?, last_attack_at = ? WHERE id IN (?, ?)', [now, now, attackerId, targetId], res));
+    return { success: true, winner: 'draw' };
+  }
+  if (!winner || !loser) return { success: false, error: 'Unknown error' };
+  const loserPlayer = (loser === attackerId) ? attacker : target;
+  const percent = 0.1;
+  const amount = Math.floor((loserPlayer.currency || 0) * percent);
+  await new Promise(res => db.run('UPDATE gw_players SET currency = currency - ? WHERE id = ?', [amount, loser], res));
+  await new Promise(res => db.run('UPDATE gw_players SET currency = currency + ?, wins = wins + 1 WHERE id = ?', [amount, winner], res));
+  // Update cooldowns
+  await new Promise(res => db.run('UPDATE gw_players SET last_attacked_at = ? WHERE id = ?', [now, loser], res));
+  await new Promise(res => db.run('UPDATE gw_players SET last_attack_at = ? WHERE id = ?', [now, winner], res));
+  return { success: true, winner };
 }
 
 export async function gwAttackGang(attackerGangId: string, targetGangId: string): Promise<{ success: boolean; error?: string; winner?: string }> {
-  const attackerGang: GWGang = await gwGetGang(attackerGangId);
-  const targetGang: GWGang = await gwGetGang(targetGangId);
+  const attackerGang = await gwGetGang(attackerGangId);
+  const targetGang = await gwGetGang(targetGangId);
   if (!attackerGang || !targetGang) return { success: false, error: 'Gang not found' };
   if (attackerGangId === targetGangId) return { success: false, error: 'Cannot attack self' };
   // Get members
   const getMembers = (gang: GWGang) => Array.isArray(gang.members) ? gang.members : JSON.parse(gang.members as any as string);
   const attackerMembers: string[] = getMembers(attackerGang);
   const targetMembers: string[] = getMembers(targetGang);
-  // Sum power for each gang
+  // Sum power for each gang (all members' weapons and stats)
   let attackerPower = 0, targetPower = 0;
   for (const pid of attackerMembers) {
-    const p: GWPlayer = await gwGetPlayer(pid);
+    const p: any = await gwGetPlayer(pid);
     if (!p) continue;
     const inv = getInventoryObj(p);
     for (const wid in inv) {
       const w = WEAPONS.find(w => w.id === wid);
       if (w) attackerPower += w.power * inv[wid];
     }
+    attackerPower += (p.wins || 0) * 2;
   }
   for (const pid of targetMembers) {
-    const p: GWPlayer = await gwGetPlayer(pid);
+    const p: any = await gwGetPlayer(pid);
     if (!p) continue;
     const inv = getInventoryObj(p);
     for (const wid in inv) {
       const w = WEAPONS.find(w => w.id === wid);
       if (w) targetPower += w.power * inv[wid];
     }
+    targetPower += (p.wins || 0) * 2;
   }
   // Add randomness
   attackerPower += Math.floor(Math.random() * 20);
   targetPower += Math.floor(Math.random() * 20);
-  let winner: string, loser: string;
-  if (attackerPower === targetPower) return { success: true, winner: 'draw' };
-  if (attackerPower > targetPower) { winner = attackerGangId; loser = targetGangId; }
-  else { winner = targetGangId; loser = attackerGangId; }
-  // Award winner, update stats
-  return new Promise((resolve) => {
-    db.run('UPDATE gw_gangs SET wins = wins + 1, bank = bank + 100 WHERE id = ?', [winner], (err: any) => {
-      if (err) return resolve({ success: false, error: 'DB error' });
-      resolve({ success: true, winner });
-    });
-  });
+  let winner: string | undefined = undefined, loser: string | undefined = undefined;
+  let winType: 'attacker' | 'target' | 'draw';
+  if (attackerPower === targetPower) {
+    winType = 'draw';
+  } else if (attackerPower > targetPower) {
+    winner = attackerGangId; loser = targetGangId; winType = 'attacker';
+  } else {
+    winner = targetGangId; loser = attackerGangId; winType = 'target';
+  }
+  // Calculate bank transfer (10% of losing gang's bank)
+  if (winType === 'draw') {
+    return { success: true, winner: 'draw' };
+  }
+  if (!winner || !loser) return { success: false, error: 'Unknown error' };
+  const loserGang = (loser === attackerGangId) ? attackerGang : targetGang;
+  const percent = 0.1;
+  const amount = Math.floor((loserGang.bank || 0) * percent);
+  await new Promise(res => db.run('UPDATE gw_gangs SET bank = bank - ? WHERE id = ?', [amount, loser], res));
+  await new Promise(res => db.run('UPDATE gw_gangs SET bank = bank + ?, wins = wins + 1 WHERE id = ?', [amount, winner], res));
+  return { success: true, winner };
 }
 
 // --- Admin tools (stubs) ---
@@ -401,8 +455,8 @@ export function gwAdminGiveCurrency(playerId: string, amount: number): Promise<{
 export function gwRegisterPlayer(playerId: string, name: string, isSuperMod: boolean = false): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT OR IGNORE INTO gw_players (id, name, is_supermod) VALUES (?, ?, ?)` ,
-      [playerId, name, isSuperMod ? 1 : 0],
+    `INSERT OR IGNORE INTO gw_players (id, name, is_supermod, currency, inventory) VALUES (?, ?, ?, ?, ?)` ,
+    [playerId, name, isSuperMod ? 1 : 0, 100, JSON.stringify({ bat: 1 })],
       (err) => {
         if (err) reject(err);
         else resolve();

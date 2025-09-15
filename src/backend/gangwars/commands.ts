@@ -84,6 +84,7 @@ export async function handleGwDistributePassiveIncome(amount: number) {
 
 // import { gwRegisterPlayer, gwCreateGang, ... } from './core';
 
+// Main Gang Wars chat command handler
 export async function handleGangWarsCommand(
   user: { id: string; name: string },
   command: string,
@@ -93,6 +94,46 @@ export async function handleGangWarsCommand(
   // Always use isSuperMod from chat event for admin permission checks
   let result;
   switch (command) {
+    case 'stats': {
+      // Show player stats
+      const player = await require('./core').gwGetPlayer(user.id);
+      if (!player) return `@${user.name} You are not registered in Gang Wars.`;
+      let msg = `@${user.name} Stats: Coins: ${player.currency} | Wins: ${player.wins}`;
+      if (player.gang_id) {
+        const gang = await require('./core').gwGetGang(player.gang_id);
+        if (gang) msg += ` | Gang: ${gang.name}`;
+      }
+      return msg;
+    }
+    case 'inventory': {
+      // Show player inventory
+      const player = await require('./core').gwGetPlayer(user.id);
+      if (!player) return `@${user.name} You are not registered in Gang Wars.`;
+      const { WEAPONS } = require('./core');
+      let inv: Record<string, number> = {};
+      try {
+        if (!player.inventory) {
+          inv = { bat: 1 };
+        } else if (typeof player.inventory === 'string') {
+          inv = JSON.parse(player.inventory);
+        } else if (Array.isArray(player.inventory)) {
+          for (const wid of player.inventory) inv[wid] = 1;
+        } else if (typeof player.inventory === 'object') {
+          inv = player.inventory as any;
+        }
+      } catch { inv = { bat: 1 }; }
+      if (!inv.bat) inv.bat = 1;
+      const items = Object.entries(inv).map(([wid, lvl]: any) => {
+        const w = WEAPONS.find((w: any) => w.id === wid);
+        return w ? `${w.name} (Lv${lvl})` : `${wid} (Lv${lvl})`;
+      });
+      return items.length ? `@${user.name} Inventory: ${items.join(' | ')}` : `@${user.name} Inventory is empty.`;
+    }
+    case 'quit': {
+      // Player deletes their own account
+      const result = await require('./core').gwDeletePlayer(user.id, user.id);
+      return result.success ? `@${user.name} You have quit Gang Wars and your account has been deleted.` : `@${user.name} Quit failed: ${result.error}`;
+    }
     case 'leaderboard': {
       // Top 3 players by wins, top 3 gangs by wins, user's player/gang rank
       const { db } = require('../core/database');
@@ -213,8 +254,20 @@ export async function handleGangWarsCommand(
       result = await gwWithdraw(user.id, Number(args[0]));
       return result.success ? `@${user.name} Withdrew ${args[0]}` : `@${user.name} Withdraw failed: ${result.error}`;
     case 'buy':
-      result = await gwBuyWeapon(user.id, args[0]);
-      return result.success ? `@${user.name} Bought weapon: ${args[0]}` : `@${user.name} Buy failed: ${result.error}`;
+      let weaponArg = args[0];
+      // Try to resolve weapon by id or name (case-insensitive, ignore spaces)
+      const { WEAPONS } = require('./core');
+      let weapon = WEAPONS.find((w: any) => w.id.toLowerCase() === weaponArg.toLowerCase());
+      if (!weapon) {
+        // Try by name (case-insensitive, ignore spaces)
+        const norm = (s: string) => s.replace(/\s+/g, '').toLowerCase();
+        weapon = WEAPONS.find((w: any) => norm(w.name) === norm(weaponArg));
+      }
+      if (!weapon) {
+        return `@${user.name} Buy failed: Weapon not found`;
+      }
+      result = await gwBuyWeapon(user.id, weapon.id);
+      return result.success ? `@${user.name} Bought weapon: ${weapon.name}` : `@${user.name} Buy failed: ${result.error}`;
     case 'upgrade':
       result = await gwUpgradeWeapon(user.id, args[0]);
       return result.success ? `@${user.name} Upgraded weapon: ${args[0]}` : `@${user.name} Upgrade failed: ${result.error}`;
@@ -279,10 +332,28 @@ export async function handleGangWarsCommand(
         return `@${user.name} Admin command denied: Super Mod only.`;
       }
       if (!args[0] || isNaN(Number(args[1]))) {
-        return `@${user.name} Usage: ~gw admingive <playerId> <amount>`;
+        return `@${user.name} Usage: ~gw admingive <player> <amount>`;
       }
-      result = await gwAdminGiveCurrency(args[0], Number(args[1]));
+      // Try to resolve player by name if not an ID
+      let targetId = args[0];
+      if (targetId.startsWith('@')) targetId = targetId.slice(1);
+      if (!/^[a-zA-Z0-9_-]+$/.test(targetId) || targetId.length < 10) { // crude check: if not a likely ID, treat as name
+        const { db } = require('../core/database');
+        const row = await new Promise<any>((resolve) => {
+          db.get('SELECT id FROM gw_players WHERE name = ? COLLATE NOCASE', [targetId], (err: any, row: any) => {
+            resolve(row);
+          });
+        });
+        if (!row || !row.id) return `@${user.name} Admin give failed: Player not found`;
+        targetId = row.id;
+      }
+      result = await gwAdminGiveCurrency(targetId, Number(args[1]));
       return result.success ? `@${user.name} Gave ${args[1]} currency to ${args[0]}.` : `@${user.name} Admin give failed: ${result.error}`;
+    case 'quit': {
+      // Player deletes their own account
+      const result = await require('./core').gwDeletePlayer(user.id, user.id);
+      return result.success ? `@${user.name} You have quit Gang Wars and your account has been deleted.` : `@${user.name} Quit failed: ${result.error}`;
+    }
     case 'deleteplayer': {
       if (!isSuperMod) {
         return `@${user.name} Command denied: Super Mod only.`;

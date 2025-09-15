@@ -25,6 +25,8 @@
       <li>Create a gang: <code>~gw creategang &lt;name&gt;</code></li>
       <li>Join a gang: <code>~gw joingang &lt;gang&gt;</code> <span style="color:#aaa">(Sends a join request; must be approved)</span></li>
       <li>Leave your gang: <code>~gw leavegang</code></li>
+  <li>Quit and delete your account: <code>~gw quit</code></li>
+  <li>New players start with 100 coins.</li>
     </ul>
     <h2>Gang Management & Requests</h2>
     <ul>
@@ -42,11 +44,22 @@
       <li>Buy weapon: <code>~gw buy &lt;weapon&gt;</code></li>
       <li>Upgrade weapon: <code>~gw upgrade &lt;weapon&gt;</code></li>
   <li>Shop: <code>~gw shop</code> <span style="color:#aaa">(Lists all weapons and prices)</span></li>
+  <li>See your stats: <code>~gw stats</code> <span style="color:#aaa">(Shows your coins, wins, and gang)</span></li>
+  <li>See your inventory: <code>~gw inventory</code> <span style="color:#aaa">(Lists all weapons you own)</span></li>
     </ul>
     <h2>Combat</h2>
     <ul>
       <li>Attack player: <code>~gw attack &lt;player&gt;</code></li>
       <li>Attack gang: <code>~gw attackgang &lt;yourGang&gt; &lt;targetGang&gt;</code></li>
+      <li><b>Combat Rules:</b>
+        <ul>
+          <li>When attacking a player, the winner takes 10% of the loser's cash.</li>
+          <li>When attacking a gang, the winning gang takes 10% of the losing gang's bank.</li>
+          <li>If you lose, you lose 10% of your own cash/bank to the winner.</li>
+          <li>All weapons and player stats are considered in combat (not just random).</li>
+          <li>When a player is attacked, they are on a 30-minute cooldown (cannot be attacked again) unless they attack someone else, which resets their cooldown.</li>
+        </ul>
+      </li>
     </ul>
     <h2>Leaderboards</h2>
     <ul>
