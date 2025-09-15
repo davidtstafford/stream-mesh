@@ -9,6 +9,7 @@ import {
   gwBuyWeapon,
   gwUpgradeWeapon,
   gwAttackPlayer,
+  GwAttackResult,
   gwAttackGang,
   gwAdminReset,
   gwAdminGiveCurrency,
@@ -94,6 +95,17 @@ export async function handleGangWarsCommand(
   // Always use isSuperMod from chat event for admin permission checks
   let result;
   switch (command) {
+    case 'listplayers': {
+      // Debug: List all player names and IDs
+      const { db } = require('../core/database');
+      const players = await new Promise<any[]>((resolve) => {
+        db.all('SELECT id, name FROM gw_players', [], (err: any, rows: any[]) => {
+          resolve(rows || []);
+        });
+      });
+      if (!players.length) return `No players found.`;
+      return 'Players: ' + players.map(p => `${p.name} (${p.id})`).join(' | ');
+    }
     case 'stats': {
       // Show player stats
       const player = await require('./core').gwGetPlayer(user.id);
@@ -287,7 +299,12 @@ export async function handleGangWarsCommand(
       result = await gwAttackPlayer(user.id, targetRow.id);
       if (result.success) {
         if (result.winner === 'draw') return `Gang Wars: The battle between ${user.name} and ${targetArg} ended in a draw!`;
-        return `Gang Wars: ${user.name} attacked ${targetArg} and ${result.winner === user.id ? 'won' : 'lost'}!`;
+        // Show cash won/lost
+        if (result.winner === user.id) {
+          return `Gang Wars: ${user.name} attacked ${targetArg} and won! (+$${result.amount})`;
+        } else {
+          return `Gang Wars: ${user.name} attacked ${targetArg} and lost! (-$${result.amount})`;
+        }
       } else {
         return `@${user.name} Attack failed: ${result.error}`;
       }
@@ -334,19 +351,31 @@ export async function handleGangWarsCommand(
       if (!args[0] || isNaN(Number(args[1]))) {
         return `@${user.name} Usage: ~gw admingive <player> <amount>`;
       }
-      // Try to resolve player by name if not an ID
-      let targetId = args[0];
-      if (targetId.startsWith('@')) targetId = targetId.slice(1);
-      if (!/^[a-zA-Z0-9_-]+$/.test(targetId) || targetId.length < 10) { // crude check: if not a likely ID, treat as name
-        const { db } = require('../core/database');
-        const row = await new Promise<any>((resolve) => {
-          db.get('SELECT id FROM gw_players WHERE name = ? COLLATE NOCASE', [targetId], (err: any, row: any) => {
+      // Try to resolve player by name or by ID (numeric or string)
+      let targetArg = args[0];
+      if (targetArg.startsWith('@')) targetArg = targetArg.slice(1);
+      let targetId = null;
+      const { db } = require('../core/database');
+      // Try by exact name (case-insensitive)
+      const rowByName = await new Promise<any>((resolve) => {
+        db.get('SELECT id FROM gw_players WHERE name = ? COLLATE NOCASE', [targetArg], (err: any, row: any) => {
+          resolve(row);
+        });
+      });
+      if (rowByName && rowByName.id) {
+        targetId = rowByName.id;
+      } else {
+        // Try by ID (numeric or string)
+        const rowById = await new Promise<any>((resolve) => {
+          db.get('SELECT id FROM gw_players WHERE id = ?', [targetArg], (err: any, row: any) => {
             resolve(row);
           });
         });
-        if (!row || !row.id) return `@${user.name} Admin give failed: Player not found`;
-        targetId = row.id;
+        if (rowById && rowById.id) {
+          targetId = rowById.id;
+        }
       }
+      if (!targetId) return `@${user.name} Admin give failed: Player not found`;
       result = await gwAdminGiveCurrency(targetId, Number(args[1]));
       return result.success ? `@${user.name} Gave ${args[1]} currency to ${args[0]}.` : `@${user.name} Admin give failed: ${result.error}`;
     case 'quit': {

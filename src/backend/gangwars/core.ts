@@ -86,9 +86,10 @@ export async function gwWithdraw(playerId: string, amount: number): Promise<{ su
 }
 
 import { db } from '../core/database';
-// Add cooldown column to players if not exists
+// Add cooldown and inventory columns to players if not exists
 db.run('ALTER TABLE gw_players ADD COLUMN last_attacked_at INTEGER', (err: any) => {});
 db.run('ALTER TABLE gw_players ADD COLUMN last_attack_at INTEGER', (err: any) => {});
+db.run('ALTER TABLE gw_players ADD COLUMN inventory TEXT', (err: any) => {});
 
 // --- DB Migration for join requests and roles ---
 db.serialize(() => {
@@ -143,32 +144,50 @@ function getInventoryObj(player: GWPlayer): Record<string, number> {
 
 export async function gwBuyWeapon(playerId: string, weaponId: string): Promise<{ success: boolean; error?: string }> {
   const player: GWPlayer = await gwGetPlayer(playerId);
+  console.log('[GW DEBUG] Player row at buy start:', player);
   if (!player) return { success: false, error: 'Player not found' };
   const weapon = WEAPONS.find(w => w.id === weaponId);
   if (!weapon) return { success: false, error: 'Weapon not found' };
   if (player.currency < weapon.cost) return { success: false, error: 'Insufficient funds' };
   // Migrate legacy array inventory to object
   let inventory: Record<string, number> = {};
+  let parsed = null;
   try {
     if (typeof player.inventory === 'string') {
-      inventory = JSON.parse(player.inventory);
-    } else if (Array.isArray(player.inventory)) {
-      for (const wid of player.inventory) inventory[wid] = 1;
-    } else if (typeof player.inventory === 'object') {
-      inventory = player.inventory as any;
+      parsed = JSON.parse(player.inventory);
+    } else {
+      parsed = player.inventory;
     }
-  } catch { inventory = {}; }
-  // Save migrated inventory if it was an array
-  if (Array.isArray(player.inventory)) {
+  } catch (e) { console.error('[GW DEBUG] Error parsing inventory:', e); parsed = {}; }
+  if (Array.isArray(parsed)) {
+    // Convert array to object and save
+    for (const wid of parsed) inventory[wid] = 1;
     await new Promise(res => db.run('UPDATE gw_players SET inventory = ? WHERE id = ?', [JSON.stringify(inventory), playerId], res));
+  } else if (typeof parsed === 'object' && parsed !== null) {
+    inventory = parsed;
+  } else {
+    inventory = {};
   }
   if (inventory[weaponId]) return { success: false, error: 'Already owned' };
   inventory[weaponId] = 1;
+  // DEBUG: Log inventory before update
+  console.log('[GW DEBUG] Before DB update, inventory:', JSON.stringify(inventory));
   // Update player inventory and currency
   return new Promise((resolve) => {
     db.run('UPDATE gw_players SET currency = currency - ?, inventory = ? WHERE id = ?', [weapon.cost, JSON.stringify(inventory), playerId], (err: any) => {
-      if (err) return resolve({ success: false, error: 'DB error' });
-      resolve({ success: true });
+      if (err) {
+        console.error('[GW DEBUG] DB error on inventory update:', err);
+        return resolve({ success: false, error: 'DB error' });
+      }
+      // DEBUG: Log after update
+      db.get('SELECT id, name, currency, inventory FROM gw_players WHERE id = ?', [playerId], (err2: any, row: any) => {
+        if (err2) {
+          console.error('[GW DEBUG] DB error reading inventory after update:', err2);
+        } else {
+          console.log('[GW DEBUG] After DB update, player row:', row);
+        }
+        resolve({ success: true });
+      });
     });
   });
 }
@@ -309,7 +328,13 @@ export async function gwUpgradeWeapon(playerId: string, weaponId: string): Promi
 }
 
 // --- Combat logic (stubs) ---
-export async function gwAttackPlayer(attackerId: string, targetId: string): Promise<{ success: boolean; error?: string; winner?: string }> {
+export interface GwAttackResult {
+  success: boolean;
+  error?: string;
+  winner?: string;
+  amount?: number;
+}
+export async function gwAttackPlayer(attackerId: string, targetId: string): Promise<GwAttackResult> {
   const attacker = await gwGetPlayer(attackerId) as any;
   const target = await gwGetPlayer(targetId) as any;
   if (!attacker || !target) return { success: false, error: 'Player not found' };
@@ -351,7 +376,7 @@ export async function gwAttackPlayer(attackerId: string, targetId: string): Prom
   if (winType === 'draw') {
     // Update cooldowns for both
     await new Promise(res => db.run('UPDATE gw_players SET last_attacked_at = ?, last_attack_at = ? WHERE id IN (?, ?)', [now, now, attackerId, targetId], res));
-    return { success: true, winner: 'draw' };
+    return { success: true, winner: 'draw', amount: 0 };
   }
   if (!winner || !loser) return { success: false, error: 'Unknown error' };
   const loserPlayer = (loser === attackerId) ? attacker : target;
@@ -362,7 +387,7 @@ export async function gwAttackPlayer(attackerId: string, targetId: string): Prom
   // Update cooldowns
   await new Promise(res => db.run('UPDATE gw_players SET last_attacked_at = ? WHERE id = ?', [now, loser], res));
   await new Promise(res => db.run('UPDATE gw_players SET last_attack_at = ? WHERE id = ?', [now, winner], res));
-  return { success: true, winner };
+  return { success: true, winner, amount };
 }
 
 export async function gwAttackGang(attackerGangId: string, targetGangId: string): Promise<{ success: boolean; error?: string; winner?: string }> {
@@ -489,20 +514,3 @@ export function gwCreateGang(playerId: string, gangName: string): Promise<void> 
   });
 }
 // Kick member (God Father only)
-export async function gwKickMember(gangId: string, targetPlayerId: string, requesterId: string): Promise<{ success: boolean; error?: string }> {
-  const requester: GWPlayer = await gwGetPlayer(requesterId);
-  if (!requester || requester.gang_id !== gangId || requester.role !== 'God Father') {
-    return { success: false, error: 'Only the God Father can kick members.' };
-  }
-  // Prevent kicking self
-  if (targetPlayerId === requesterId) return { success: false, error: 'Cannot kick yourself.' };
-  // Check target is in gang
-  const target: GWPlayer = await gwGetPlayer(targetPlayerId);
-  if (!target || target.gang_id !== gangId) return { success: false, error: 'Target not in your gang.' };
-  return new Promise((resolve) => {
-    db.run('UPDATE gw_players SET gang_id = NULL, role = NULL WHERE id = ?', [targetPlayerId], (err: any) => {
-      if (err) return resolve({ success: false, error: 'DB error' });
-      resolve({ success: true });
-    });
-  });
-}
