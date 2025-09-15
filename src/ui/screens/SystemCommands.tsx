@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
-interface SystemCommand {
+export interface SystemCommand {
   command: string;
   enabled: boolean;
   description: string;

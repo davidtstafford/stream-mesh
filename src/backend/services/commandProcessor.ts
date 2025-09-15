@@ -37,6 +37,24 @@ class CommandProcessor extends EventEmitter {
 
   private initializeSystemCommands() {
     // ~setperm command (supermod only)
+
+    // ~gangwars command: show Gang Wars guide
+    const gangwarsCommand: SystemCommand = {
+      command: '~gangwars',
+      enabled: true,
+      description: 'Show the Gang Wars game guide and all chat commands',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        // Respond with a link to the gangwars.html page
+        await this.sendCommandResponse(
+          `@${event.user} Gang Wars Guide: https://YOURDOMAIN/gangwars.html`,
+          '~gangwars',
+          event.platform
+        );
+      }
+    };
+    this.systemCommands.set('~gangwars', gangwarsCommand);
     const setPermCommand: SystemCommand = {
       command: '~setperm',
       enabled: true,

@@ -13,6 +13,7 @@ import EventsAdmin from './screens/EventsAdmin';
 import EventHistory from './screens/EventHistory';
 import Developer from './screens/Developer';
 import EventWindow from './components/EventWindow';
+import { GamesSection } from './games/GamesSection';
 import './theme/theme.css';
 
 const screenMap: Record<string, React.ReactNode> = {
@@ -27,6 +28,7 @@ const screenMap: Record<string, React.ReactNode> = {
   eventsAdmin: <EventsAdmin />,
   eventHistory: <EventHistory />,
   developer: <Developer />,
+  games: <GamesSection />,
 };
 
 const App: React.FC = () => {

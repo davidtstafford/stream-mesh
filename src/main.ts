@@ -1,3 +1,49 @@
+// --- Gang Wars IPC handlers ---
+import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang } from './backend/gangwars/core';
+
+ipcMain.handle('gangwars:listGangs', async () => {
+  try {
+    const gangs = await gwListGangs();
+    return { success: true, gangs };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:listPlayers', async () => {
+  try {
+    const players = await gwListPlayers();
+    return { success: true, players };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:deleteGang', async (_event, gangId: string) => {
+  try {
+    const result = await gwDisbandGang(gangId);
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:renameGang', async (_event, gangId: string, newName: string) => {
+  try {
+    // Simple implementation: update the gang name
+    const gang = await gwGetGang(gangId);
+    if (!gang) return { success: false, error: 'Gang not found' };
+    const { db } = require('./backend/core/database');
+    return new Promise((resolve) => {
+      db.run('UPDATE gw_gangs SET name = ? WHERE id = ?', [newName, gangId], (err: any) => {
+        if (err) resolve({ success: false, error: 'DB error' });
+        else resolve({ success: true });
+      });
+    });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
 // Main Electron process
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
