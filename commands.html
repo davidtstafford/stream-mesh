@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stream Mesh Chat Commands</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #181a20; color: #fff; margin: 0; padding: 0; }
+    .container { max-width: 700px; margin: 40px auto; background: #23262f; border-radius: 12px; box-shadow: 0 2px 12px #0008; padding: 32px; }
+    h1 { color: #7ed957; margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #333; }
+    th { background: #22242b; color: #7ed957; text-align: left; }
+    tr:last-child td { border-bottom: none; }
+    code { background: #22242b; color: #7ed957; padding: 2px 6px; border-radius: 4px; }
+    .desc { color: #aaa; font-size: 0.97em; }
+    @media (max-width: 600px) {
+      .container { padding: 12px; }
+      th, td { padding: 7px 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stream Mesh Chat Commands</h1>
+    <p class="desc">Below are the available chat commands for Stream Mesh. Use these in your Twitch chat to control TTS and other features. <br> <b>Note:</b> Some commands require moderator or super moderator permissions.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Description</th>
+          <th>Permission</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>~voices</code></td><td>Shows a link to the full list of available TTS voices.</td><td>Viewer</td></tr>
+        <tr><td><code>~setvoice [voice]</code></td><td>Set your personal TTS voice. Example: <code>~setvoice Brian</code></td><td>Viewer</td></tr>
+        <tr><td><code>~myvoice</code></td><td>Show your current TTS voice setting.</td><td>Viewer</td></tr>
+        <tr><td><code>~viewervoice @user</code></td><td>Show another user's current TTS voice.</td><td>Viewer</td></tr>
+        <tr><td><code>~setviewervoice @user [voice]</code></td><td>Set another user's TTS voice. Example: <code>~setviewervoice @user Brian</code></td><td>Super Mod</td></tr>
+        <tr><td><code>~enabletts on|off</code></td><td>Enable or disable global TTS for the channel.</td><td>Super Mod</td></tr>
+        <tr><td><code>~enablevoice @user on|off</code></td><td>Enable or disable TTS for a specific user.</td><td>Mod</td></tr>
+        <tr><td><code>~setperm @user viewer|mod|smod</code></td><td>Set a user's permission level.</td><td>Super Mod</td></tr>
+        <tr><td><code>~hello</code></td><td>Replies with a hello message.</td><td>Viewer</td></tr>
+        <tr><td><code>~commands</code></td><td>Shows this commands list link.</td><td>Viewer</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:32px; color:#aaa; font-size:0.95em;">For a full list of TTS voices, use <code>~voices</code> or visit <a href="https://stream-mesh-website.web.app/voices.html" style="color:#7ed957;">voices.html</a>.</p>
+  </div>
+</body>
+</html>

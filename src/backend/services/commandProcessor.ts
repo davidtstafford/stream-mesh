@@ -36,7 +36,71 @@ class CommandProcessor extends EventEmitter {
   }
 
   private initializeSystemCommands() {
-    // ~setperm command (supermod only)
+    // ~gangwars command: show Gang Wars guide
+    const gangwarsCommand: SystemCommand = {
+      command: '~gangwars',
+      enabled: true,
+      description: 'Show the Gang Wars game guide and all chat commands',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        await this.sendCommandResponse(
+          `@${event.user} Gang Wars Guide: https://YOURDOMAIN/gangwars.html`,
+          '~gangwars',
+          event.platform
+        );
+      }
+    };
+    this.systemCommands.set('~gangwars', gangwarsCommand);
+
+    // ~gw command: Gang Wars game commands (register, creategang, etc.)
+    const gwCommand: SystemCommand = {
+      command: '~gw',
+      enabled: true,
+      description: 'Gang Wars game commands (register, creategang, etc.)',
+      permissionLevel: 'viewer',
+      enableTTSReply: false,
+      handler: async (event: StreamEvent) => {
+        try {
+          const message = event.message?.trim() || '';
+          // Remove ~gw and split args
+          const args = message.split(' ').slice(1);
+          if (args.length === 0) {
+            await this.sendCommandResponse(
+              `@${event.user} Usage: ~gw <register|creategang|joingang|leavegang|deposit|withdraw|buy|upgrade|attack|attackgang|adminreset|admingive>`,
+              '~gw',
+              event.platform
+            );
+            return;
+          }
+          const subcommand = args[0].toLowerCase();
+          // Import here to avoid circular deps
+          const { handleGangWarsCommand } = require('../../backend/gangwars/commands');
+          // Determine user info
+          const user = { id: event.tags?.['user-id'] || event.user, name: event.user };
+          // Check if user is supermod (reuse permission logic)
+          let isSuperMod = false;
+          if (event.tags?.role === 'super_moderator') isSuperMod = true;
+          // Sync Super Mod status into player profile before handling command
+          const { db } = require('../core/database');
+          db.run('UPDATE gw_players SET is_supermod = ? WHERE id = ?', [isSuperMod ? 1 : 0, user.id], () => {
+            // Call handler and get response
+            handleGangWarsCommand(user, subcommand, args.slice(1), isSuperMod).then(async (response: string) => {
+              if (response) {
+                await this.sendCommandResponse(response, '~gw', event.platform);
+              }
+            });
+          });
+        } catch (err) {
+          await this.sendCommandResponse(
+            `@${event.user} Sorry, failed to process Gang Wars command.`,
+            '~gw',
+            event.platform
+          );
+        }
+      }
+    };
+    this.systemCommands.set('~gw', gwCommand);
     const setPermCommand: SystemCommand = {
       command: '~setperm',
       enabled: true,

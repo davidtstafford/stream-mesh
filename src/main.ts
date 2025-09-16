@@ -1,3 +1,4 @@
+
 // Main Electron process
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
@@ -12,6 +13,101 @@ import { configurePolly, getPollyConfig, synthesizeSpeech } from './backend/serv
 import { ttsQueue } from './backend/services/ttsQueue';
 import { registerObsOverlayEndpoints } from './backend/services/obsIntegration';
 import { commandProcessor } from './backend/services/commandProcessor';
+import { loadGangWarsSettings, saveGangWarsSettings, GangWarsSettings } from './backend/gangwars/settings';
+import { gwListGangs, gwListPlayers, gwDisbandGang, gwGetGang, gwListJoinRequests, gwDeletePlayer, gwAdminReset } from './backend/gangwars/core';
+// Admin reset game
+ipcMain.handle('gangwars:adminReset', async () => {
+  try {
+    const result = await gwAdminReset();
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+// Delete a player (Super Mod only)
+ipcMain.handle('gangwars:deletePlayer', async (_event, requesterId: string, playerId: string) => {
+  try {
+    const result = await gwDeletePlayer(requesterId, playerId);
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+// List join requests for a gang
+ipcMain.handle('gangwars:listJoinRequests', async (_event, gangId: string) => {
+  try {
+    const requests = await gwListJoinRequests(gangId);
+    return { success: true, requests };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// ...existing code...
+
+ipcMain.handle('gangwars:getSettings', async () => {
+  try {
+    const settings = loadGangWarsSettings();
+    return { success: true, settings };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:setSettings', async (_event, settings: GangWarsSettings) => {
+  try {
+    saveGangWarsSettings(settings);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+// Main Electron process
+// ...existing code...
+
+ipcMain.handle('gangwars:listGangs', async () => {
+  try {
+    const gangs = await gwListGangs();
+    return { success: true, gangs };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:listPlayers', async () => {
+  try {
+    const players = await gwListPlayers();
+    return { success: true, players };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:deleteGang', async (_event, gangId: string) => {
+  try {
+    const result = await gwDisbandGang(gangId);
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('gangwars:renameGang', async (_event, gangId: string, newName: string) => {
+  try {
+    // Simple implementation: update the gang name
+    const gang = await gwGetGang(gangId);
+    if (!gang) return { success: false, error: 'Gang not found' };
+    const { db } = require('./backend/core/database');
+    return new Promise((resolve) => {
+      db.run('UPDATE gw_gangs SET name = ? WHERE id = ?', [newName, gangId], (err: any) => {
+        if (err) resolve({ success: false, error: 'DB error' });
+        else resolve({ success: true });
+      });
+    });
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
 
 // Use require for Node.js built-in modules and potentially problematic packages
 const fs = require('fs');
@@ -252,6 +348,7 @@ function saveCommandSettings(settings: CommandSettings) {
 }
 
 function createWindow() {
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -276,11 +373,11 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:3000').catch(err => {
+    win.loadURL('http://localhost:3000').catch((err: any) => {
       console.error('Failed to load dev server:', err);
     });
   } else {
-    win.loadFile(path.join(__dirname, 'index.html')).catch(err => {
+    win.loadFile(path.join(__dirname, 'index.html')).catch((err: any) => {
       console.error('Failed to load index.html:', err);
     });
   }

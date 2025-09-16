@@ -18,6 +18,46 @@ export const db = new sqlite3.Database(dbPath, (err) => {
 
 // Example: Create a table for chat messages if it doesn't exist
 export function initDatabase() {
+  // Gang Wars: Players table
+  db.run(`CREATE TABLE IF NOT EXISTS gw_players (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    currency INTEGER NOT NULL DEFAULT 0,
+    gang_id TEXT,
+    inventory TEXT DEFAULT '[]',
+    wins INTEGER NOT NULL DEFAULT 0,
+    is_supermod INTEGER NOT NULL DEFAULT 0
+  )`);
+
+  // Gang Wars: Gangs table
+  db.run(`CREATE TABLE IF NOT EXISTS gw_gangs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    members TEXT DEFAULT '[]',
+    bank INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    disband_votes TEXT DEFAULT '[]'
+  )`);
+
+  // Gang Wars: Weapons table
+  db.run(`CREATE TABLE IF NOT EXISTS gw_weapons (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    power INTEGER NOT NULL,
+    accuracy INTEGER NOT NULL,
+    cost INTEGER NOT NULL,
+    effect TEXT
+  )`);
+
+  // Gang Wars: Transactions table (optional)
+  db.run(`CREATE TABLE IF NOT EXISTS gw_transactions (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    player_id TEXT,
+    gang_id TEXT,
+    amount INTEGER,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user TEXT,
