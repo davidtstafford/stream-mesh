@@ -1,6 +1,6 @@
 {
   "name": "streammesh",
-  "version": "4.0.0",
+  "version": "3.2.0",
   "description": "Stream Mesh - Advanced streaming event management and viewer interaction platform",
   "main": "dist/main.js",
   "type": "commonjs",
