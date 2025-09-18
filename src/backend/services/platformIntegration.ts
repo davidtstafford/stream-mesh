@@ -77,13 +77,19 @@ class PlatformIntegrationService extends EventEmitter {
     // Listen for chat messages and emit events
     this.twitchClient.on('message', (channel: string, tags: any, message: string, self: boolean) => {
       if (!self) {
+        // Map Twitch badges to a role property
+        let role = 'viewer';
+        if (tags.badges) {
+          if (tags.badges.broadcaster) role = 'super_moderator';
+          else if (tags.badges.mod) role = 'super_moderator';
+        }
         const chatEvent = {
           type: 'chat' as const,
           platform: 'twitch' as const,
           channel,
           user: tags['display-name'] || tags.username,
           message,
-          tags,
+          tags: { ...tags, role },
           time: new Date().toISOString(),
         };
         eventBus.emitEvent(chatEvent);

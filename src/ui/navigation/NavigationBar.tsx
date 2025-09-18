@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 const navItems = [
   { label: 'Link to Streams', key: 'link', icon: '🔗' },
   { label: 'Events', key: 'events', icon: '📊' },
+  { label: 'Games', key: 'games', icon: '🎲' },
 ];
 const adminItems = [
   { label: 'Event History', key: 'eventHistory', icon: '📜' },
