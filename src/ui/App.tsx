@@ -11,6 +11,8 @@ import OBS from './screens/OBS/OBS';
 import Events from './screens/Events';
 import EventsAdmin from './screens/EventsAdmin';
 import EventHistory from './screens/EventHistory';
+import EventsSearch from './screens/EventsSearch';
+import Chat from './screens/Chat';
 import Developer from './screens/Developer';
 import EventWindow from './components/EventWindow';
 import './theme/theme.css';
@@ -23,7 +25,9 @@ const screenMap: Record<string, React.ReactNode> = {
   systemCommands: <SystemCommands />, 
   customCommands: <CustomCommands />, 
   obs: <OBS />,
-  events: <Events />,
+  events: <Events />, // Live event monitor
+  eventsSearch: <EventsSearch />, // Event search/history
+  chat: <Chat />, // Real-time chat
   eventsAdmin: <EventsAdmin />,
   eventHistory: <EventHistory />,
   developer: <Developer />,

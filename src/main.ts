@@ -3,7 +3,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 // Use require instead of import for potentially problematic packages
 const isDev = require('electron-is-dev');
-import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
+import { initDatabase, insertChatMessage, fetchChatMessages, deleteAllChatMessages, deleteChatMessageById, fetchViewers, fetchSettings, fetchViewerSettings, upsertViewerSetting, upsertViewer, registerEventBusDbListener, insertEvent, fetchEvents, fetchEventsWithViewerNames, deleteEventById, deleteEventsByType, deleteEventsOlderThan, deleteAllEvents, countEvents } from './backend/core/database';
 import { platformIntegrationService } from './backend/services/platformIntegration';
 import { startTwitchOAuth, clearTwitchSession } from './backend/services/twitchOAuth';
 import { startKickOAuth, validateKickToken, refreshKickToken, clearKickSession } from './backend/services/kickOAuth';
@@ -42,6 +42,7 @@ const eventConfigFilePath = path.join(userDataPath, 'eventConfig.json');
 const commandSettingsFilePath = path.join(userDataPath, 'commandSettings.json');
 const kickCredentialsFilePath = path.join(userDataPath, 'kickCredentials.json');
 const twitchCredentialsFilePath = path.join(userDataPath, 'twitchCredentials.json');
+const chatSettingsFilePath = path.join(userDataPath, 'chatSettings.json');
 
 // Track event windows
 const eventWindows = new Map<string, BrowserWindow>();
@@ -249,6 +250,27 @@ function loadCommandSettings(): CommandSettings {
 
 function saveCommandSettings(settings: CommandSettings) {
   fs.writeFileSync(commandSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+// Chat settings
+interface ChatSettings {
+  maxMessages: number; // Maximum number of chat messages to keep in the Chat screen
+}
+
+function loadChatSettings(): ChatSettings {
+  try {
+    const data = fs.readFileSync(chatSettingsFilePath, 'utf-8');
+    const parsed = JSON.parse(data);
+    return {
+      maxMessages: typeof parsed.maxMessages === 'number' ? parsed.maxMessages : 100,
+    };
+  } catch {
+    return { maxMessages: 100 }; // Default to 100 messages
+  }
+}
+
+function saveChatSettings(settings: ChatSettings) {
+  fs.writeFileSync(chatSettingsFilePath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
 function createWindow() {
@@ -497,6 +519,15 @@ app.whenReady().then(async () => {
   ipcMain.handle('events:fetch', async (_event, filters) => {
     return new Promise((resolve, reject) => {
       fetchEvents(filters || {}, (err, rows) => {
+        if (err) reject(err.message);
+        else resolve(rows || []);
+      });
+    });
+  });
+
+  ipcMain.handle('events:fetchWithViewerNames', async (_event, filters) => {
+    return new Promise((resolve, reject) => {
+      fetchEventsWithViewerNames(filters || {}, (err, rows) => {
         if (err) reject(err.message);
         else resolve(rows || []);
       });
@@ -831,6 +862,16 @@ app.whenReady().then(async () => {
   
   ipcMain.handle('commands:getSettings', async () => {
     return loadCommandSettings();
+  });
+
+  // Chat settings IPC handlers
+  ipcMain.handle('chat:getSettings', async () => {
+    return loadChatSettings();
+  });
+
+  ipcMain.handle('chat:setSettings', async (_event, settings: ChatSettings) => {
+    saveChatSettings(settings);
+    return true;
   });
 
   // Chat message sending IPC handler
