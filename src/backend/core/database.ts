@@ -324,12 +324,14 @@ export function ensureDefaultViewerSettings(viewerId: string, cb: (err: Error | 
   });
 }
 
-// Upsert a viewer (insert if new, update last_active_time if exists)
+// Upsert a viewer (insert if new, update last_active_time and name if exists)
 export function upsertViewer({ id, name, platform, platform_key, last_active_time }: { id: string, name: string, platform: string, platform_key: string, last_active_time: string }, cb?: (err: Error | null) => void) {
   db.run(
     `INSERT INTO viewers (id, name, platform, platform_key, last_active_time)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET last_active_time=excluded.last_active_time` ,
+     ON CONFLICT(id) DO UPDATE SET 
+       name=excluded.name,
+       last_active_time=excluded.last_active_time` ,
     [id, name, platform, platform_key, last_active_time],
     (err) => {
       if (!err) {
