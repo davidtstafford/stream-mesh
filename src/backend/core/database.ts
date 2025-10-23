@@ -118,6 +118,7 @@ export function fetchEvents(
     endTime?: string;
     limit?: number;
     offset?: number;
+    searchText?: string; // New: search within message and data fields
   },
   cb: (err: Error | null, rows?: any[]) => void
 ) {
@@ -144,8 +145,81 @@ export function fetchEvents(
     query += ' AND time <= ?';
     params.push(filters.endTime);
   }
+  if (filters.searchText) {
+    query += ' AND (message LIKE ? OR data LIKE ? OR metadata LIKE ?)';
+    const searchPattern = `%${filters.searchText}%`;
+    params.push(searchPattern, searchPattern, searchPattern);
+  }
 
   query += ' ORDER BY time DESC';
+
+  if (filters.limit) {
+    query += ' LIMIT ?';
+    params.push(filters.limit);
+    if (filters.offset) {
+      query += ' OFFSET ?';
+      params.push(filters.offset);
+    }
+  }
+
+  db.all(query, params, cb);
+}
+
+// Fetch events with viewer names (joined from viewers table)
+export function fetchEventsWithViewerNames(
+  filters: {
+    type?: string;
+    platform?: string;
+    user?: string;
+    startTime?: string;
+    endTime?: string;
+    limit?: number;
+    offset?: number;
+    searchText?: string;
+  },
+  cb: (err: Error | null, rows?: any[]) => void
+) {
+  let query = `
+    SELECT 
+      e.*,
+      v.name as viewer_name,
+      v.platform as viewer_platform
+    FROM events e
+    LEFT JOIN viewers v ON (
+      v.platform = e.platform AND 
+      (v.name = e.user OR v.platform_key = e.user)
+    )
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+
+  if (filters.type) {
+    query += ' AND e.type = ?';
+    params.push(filters.type);
+  }
+  if (filters.platform) {
+    query += ' AND e.platform = ?';
+    params.push(filters.platform);
+  }
+  if (filters.user) {
+    query += ' AND e.user = ?';
+    params.push(filters.user);
+  }
+  if (filters.startTime) {
+    query += ' AND e.time >= ?';
+    params.push(filters.startTime);
+  }
+  if (filters.endTime) {
+    query += ' AND e.time <= ?';
+    params.push(filters.endTime);
+  }
+  if (filters.searchText) {
+    query += ' AND (e.message LIKE ? OR e.data LIKE ? OR e.metadata LIKE ?)';
+    const searchPattern = `%${filters.searchText}%`;
+    params.push(searchPattern, searchPattern, searchPattern);
+  }
+
+  query += ' ORDER BY e.time DESC';
 
   if (filters.limit) {
     query += ' LIMIT ?';
@@ -187,6 +261,7 @@ export function countEvents(
     user?: string;
     startTime?: string;
     endTime?: string;
+    searchText?: string; // New: search within message and data fields
   },
   cb: (err: Error | null, count?: number) => void
 ) {
@@ -212,6 +287,11 @@ export function countEvents(
   if (filters.endTime) {
     query += ' AND time <= ?';
     params.push(filters.endTime);
+  }
+  if (filters.searchText) {
+    query += ' AND (message LIKE ? OR data LIKE ? OR metadata LIKE ?)';
+    const searchPattern = `%${filters.searchText}%`;
+    params.push(searchPattern, searchPattern, searchPattern);
   }
 
   db.get(query, params, (err, row: any) => {
